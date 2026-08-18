@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>STDiT3 架构学习可视化</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#lesson">跳到当前步骤</a>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="kicker">SOURCE-GROUNDED · OFFLINE</p>
+      <h1>STDiT3 架构学习可视化</h1>
+      <p class="hero-subtitle">逐步理解原生 Open-Sora v1.3 与 WMPO action-conditioned 世界模型的真实 forward 数据流。</p>
+      <div class="hero-actions">
+        <a class="overview-link" href="overview.html">打开完整架构总览 →</a>
+      </div>
+    </div>
+    <div class="spec-strip" aria-label="STDiT3-XL/2 主要规格">
+      <div><span>Depth</span><strong>28</strong></div>
+      <div><span>Hidden</span><strong>1152</strong></div>
+      <div><span>Heads</span><strong>16</strong></div>
+      <div><span>MLP</span><strong>4608</strong></div>
+      <div><span>Patch</span><strong>1×2×2</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="toolbar" aria-label="视图与播放控制">
+      <div class="mode-group" role="group" aria-label="架构视图">
+        <button type="button" class="mode-button" data-mode="native" aria-pressed="false">原生 Open-Sora</button>
+        <button type="button" class="mode-button" data-mode="wmpo" aria-pressed="false">WMPO</button>
+        <button type="button" class="mode-button is-active" data-mode="compare" aria-pressed="true">并排对比</button>
+      </div>
+      <div class="playback-group">
+        <button type="button" id="prev-step" class="control-button" aria-label="上一步">← 上一步</button>
+        <button type="button" id="auto-play" class="control-button primary" aria-pressed="false">▶ 自动播放</button>
+        <button type="button" id="next-step" class="control-button" aria-label="下一步">下一步 →</button>
+      </div>
+    </section>
+
+    <nav class="step-nav" aria-label="Forward 步骤">
+      <button type="button" class="step-button is-active" data-step="0"><span>01</span>输入</button>
+      <button type="button" class="step-button" data-step="1"><span>02</span>Patch</button>
+      <button type="button" class="step-button" data-step="2"><span>03</span>条件</button>
+      <button type="button" class="step-button" data-step="3"><span>04</span>AdaLN 参数</button>
+      <button type="button" class="step-button" data-step="4"><span>05</span>Spatial</button>
+      <button type="button" class="step-button" data-step="5"><span>06</span>Temporal</button>
+      <button type="button" class="step-button" data-step="6"><span>07</span>×28 主干</button>
+      <button type="button" class="step-button" data-step="7"><span>08</span>输出</button>
+    </nav>
+
+    <div class="progress-track" role="progressbar" aria-label="学习进度" aria-valuemin="1" aria-valuemax="8" aria-valuenow="1">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+
+    <section id="lesson" class="lesson" aria-live="polite">
+      <div class="lesson-heading">
+        <div>
+          <p id="step-eyebrow" class="step-eyebrow"></p>
+          <h2 id="step-title"></h2>
+        </div>
+        <p id="step-intro" class="step-intro"></p>
+      </div>
+
+      <div id="architecture-view" class="architecture-view"></div>
+
+      <aside id="difference-panel" class="difference-panel" aria-labelledby="difference-title">
+        <div class="difference-heading">
+          <p class="difference-kicker">WHY IT MATTERS</p>
+          <h3 id="difference-title">本步关键差异</h3>
+        </div>
+        <div id="difference-content" class="difference-content"></div>
+      </aside>
+    </section>
+
+    <section class="legend" aria-label="图例">
+      <span><i class="legend-dot shared"></i>共享结构</span>
+      <span><i class="legend-dot condition"></i>条件支路</span>
+      <span><i class="legend-dot action"></i>WMPO action 改造</span>
+      <span><i class="legend-dot removed"></i>禁用或移除</span>
+      <span><i class="legend-dot drift"></i>fork / 版本差异</span>
+    </section>
+
+    <section class="reading-guide">
+      <h2>读图约定</h2>
+      <div class="guide-grid">
+        <div>
+          <strong>B / T / S / C</strong>
+          <p>batch / latent 帧数 / 每帧 patch 数 / hidden size。</p>
+        </div>
+        <div>
+          <strong>示例窗口</strong>
+          <p>WMPO 使用 To=4 历史帧、Ta=8 未来动作，因此 T=12、action=[B,8,7]。</p>
+        </div>
+        <div>
+          <strong>差异分级</strong>
+          <p>绿色表示世界模型核心设计；黄色表示 fork 与原生 v1.3 的版本差异，不直接视为论文创新。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>依据本地源码整理：Open-Sora <code>opensora/v1.3</code> 与 WMPO <code>main</code>。页面不执行模型代码。· <a href="overview.html">完整架构总览</a></p>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

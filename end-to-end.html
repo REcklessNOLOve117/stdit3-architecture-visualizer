@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>WMPO STDiT3 一体化端到端架构</title>
+  <link rel="stylesheet" href="assets/end-to-end.css">
+</head>
+<body>
+  <a class="skip-link" href="#architecture-viewport">跳到一体化架构画布</a>
+  <header class="unified-header">
+    <div class="header-nav"><a href="overview.html">← 完整架构地图</a><a href="block-detail.html">Block 精细图</a></div>
+    <div class="header-title">
+      <p>ONE-CANVAS · INPUT → OUTPUT · PROGRESSIVE EXPANSION</p>
+      <h1>WMPO STDiT3 一体化端到端架构</h1>
+      <span>主干、单层 Block、Attention Q/K/V、MLP 和输出头全部放在同一张图中，并用放大箭头直接连接。</span>
+    </div>
+    <div class="header-spec"><b>STDiT3-XL/2</b><span>28 pairs · C=1152 · 16 heads · head_dim=72</span></div>
+  </header>
+  <main class="unified-shell">
+    <div class="canvas-toolbar">
+      <div class="zoom-group" role="group" aria-label="画布缩放">
+        <button type="button" id="zoom-out" aria-label="缩小">−</button><output id="zoom-value">50%</output><button type="button" id="zoom-in" aria-label="放大">＋</button><button type="button" id="fit-canvas">适合窗口</button><button type="button" id="actual-size">100%</button>
+      </div>
+      <div class="focus-group" role="group" aria-label="聚焦架构区域">
+        <button type="button" data-focus="input">输入</button><button type="button" data-focus="condition">条件路由</button><button type="button" data-focus="block">单层 Block</button><button type="button" data-focus="handoff">x₂ 交接</button><button type="button" data-focus="attention">Attention / MLP</button><button type="button" data-focus="output">输出</button>
+      </div>
+      <p>拖动画布 · 滚轮缩放 · 点击模块查看说明</p>
+    </div>
+    <div id="architecture-viewport" class="architecture-viewport" tabindex="0" aria-label="可拖拽缩放的一体化 STDiT3 架构图">
+      <div id="architecture-canvas" class="architecture-canvas">
+        <svg class="connector-layer" viewBox="0 0 2850 1700" aria-hidden="true">
+          <defs>
+            <marker id="arrow-main" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+            <marker id="arrow-zoom" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+            <marker id="arrow-action" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+            <marker id="arrow-time" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+            <marker id="arrow-handoff" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+          </defs>
+          <g id="dynamic-connectors"></g>
+        </svg>
+        <div class="canvas-title"><span>WMPO WORLD MODEL · STDiT3.forward</span><h2>从输入 latent 到输出 latent 的完整计算图</h2><p>灰色虚线是模型外部；蓝色是 video hidden；绿色是 action；橙色是 timestep/AdaLN；粗虚线箭头表示“把这个模块放大”。</p></div>
+
+        <section class="canvas-panel global-panel" aria-labelledby="global-title">
+          <header><small>GLOBAL FORWARD</small><h3 id="global-title">① 端到端主干</h3></header>
+          <div class="global-row external-row">
+            <button id="node-rgb" type="button" class="arch-node external-node detail-node" data-detail="rgb"><small>STDiT3 外部</small><b>RGB 视频</b><code>[B,3,12,H₀,W₀]</code></button>
+            <button id="node-vae" type="button" class="arch-node external-node detail-node" data-detail="vae"><small>外部模块</small><b>VAE Encoder + 加噪</b><code>RGB → xₜ</code></button>
+            <button id="node-latent" type="button" class="arch-node video-node detail-node" data-detail="latent"><small>真正模型输入</small><b>噪声 latent xₜ</b><code>[B,4,12,Hx,Wx]</code></button>
+            <button id="node-patch" type="button" class="arch-node token-node detail-node" data-detail="patch"><small>Conv3D (1,2,2)</small><b>PatchEmbed3D</b><code>[B,12,S,1152]</code></button>
+          </div>
+          <div class="global-token-row"><button id="node-position" type="button" class="arch-node token-node detail-node" data-detail="position"><small>空间位置</small><b>＋ 2D sin/cos PE</b><code>[1,S,1152] 沿 T 广播</code></button><span aria-hidden="true">→</span><button id="node-pairs" type="button" class="arch-node backbone-node detail-node" data-detail="pairs"><small>主干</small><b>28 × Layer Pair</b><code>Spatial → Temporal</code></button></div>
+          <div class="pair-stack"><div id="pair-1"><span>Pair 1</span><b>Spatial₁ → Temporal₁</b></div><div id="pair-2"><span>Pair 2</span><b>Spatial₂ → Temporal₂</b></div><i>⋮</i><div id="pair-27"><span>Pair 27</span><b>Spatial₂₇ → Temporal₂₇</b></div><div id="pair-28"><span>Pair 28</span><b>Spatial₂₈ → Temporal₂₈</b></div></div>
+          <div class="global-output-flow"><button id="node-final" type="button" class="arch-node output-node detail-node" data-detail="final"><b>Final Layer</b><code>LN → AdaLN(t) → Linear</code></button><i aria-hidden="true">↓</i><button id="node-unpatchify" type="button" class="arch-node output-node detail-node" data-detail="unpatchify"><b>unpatchify</b><code>[B,Cout,12,Hx,Wx]</code></button><i aria-hidden="true">↓</i><button id="node-decoder" type="button" class="arch-node external-node detail-node" data-detail="decoder"><small>STDiT3 外部</small><b>Sampler + VAE Decoder</b><code>latent → future RGB</code></button></div>
+        </section>
+
+        <section class="canvas-panel condition-panel" aria-labelledby="condition-title">
+          <header><small>CONDITION SYSTEM</small><h3 id="condition-title">② Action / timestep 条件</h3></header>
+          <div class="condition-columns">
+            <div class="condition-lane action-lane"><button id="cond-actions" type="button" class="small-node action-node detail-node" data-detail="actions"><b>8× 7D actions</b><code>[B,8,7]</code></button><i>↓</i><button id="cond-action-encoder" type="button" class="small-node action-node detail-node" data-detail="actionEncoder"><b>ActionEncoder</b><code>7→4608→1152</code></button><i>↓</i><button id="cond-none" type="button" class="small-node action-node detail-node" data-detail="none"><b>prepend NONE×4</b><code>[B,12,1152]</code></button><i>↓ ＋ Eₜ(t) per frame</i><button id="cond-spatial-params" type="button" class="small-node mixed-node detail-node" data-detail="spatialCondition"><b>Spatial t_block</b><code>[B,12,6,1152]</code></button></div>
+            <div class="condition-lane time-lane"><button id="cond-timestep" type="button" class="small-node time-node detail-node" data-detail="timestep"><b>timestep [B]</b><code>sin/cos 256</code></button><i>↓ MLP</i><button id="cond-t-embed" type="button" class="small-node time-node detail-node" data-detail="tEmbed"><b>TimestepEmbedder</b><code>[B,1152]</code></button><i>↓ t_block</i><button id="cond-temporal-params" type="button" class="small-node time-node detail-node" data-detail="temporalCondition"><b>Temporal params</b><code>[B,1,6,1152]</code></button><i>↓ final table</i><button id="cond-final-params" type="button" class="small-node time-node detail-node" data-detail="finalCondition"><b>Final shift / scale</b><code>2×1152</code></button></div>
+          </div>
+          <div class="six-param-row"><span>shift_msa</span><span>scale_msa</span><span>gate_msa</span><span>shift_mlp</span><span>scale_mlp</span><span>gate_mlp</span></div>
+          <p class="condition-routing-note"><b>绿色虚线＝6 组条件参数的路由</b><span>分别送到两处 AdaLN 与两个 gate；不是 Spatial 输出，也不是 x₂ 的广播。</span></p>
+          <div class="routing-map" aria-label="六组参数对应的四个目标位置">
+            <span><b>shift_msa + scale_msa</b> → Action-AdaLN 1</span>
+            <span><b>gate_msa</b> → Attention 后的 gate</span>
+            <span><b>shift_mlp + scale_mlp</b> → Action-AdaLN 2</span>
+            <span><b>gate_mlp</b> → MLP 后的 gate</span>
+          </div>
+        </section>
+
+        <section class="canvas-panel block-panel" aria-labelledby="block-title">
+          <header><small>ZOOM FROM “28 × LAYER PAIR”</small><h3 id="block-title">③ 展开一个 Pair ℓ</h3><code>[B,12,S,1152]</code></header>
+          <div class="block-wire-legend" aria-label="连线含义">
+            <span><i class="wire-sample handoff-sample"></i><b>粗实线</b>：x₂ hidden 的真实特征流</span>
+            <span><i class="wire-sample action-sample"></i><b>绿色虚线</b>：6 组参数送往 4 个落点，不是输出广播</span>
+          </div>
+          <div class="block-columns">
+            <article id="spatial-block" class="single-block spatial-block"><h4>Spatial Block ℓ <span>action + t</span></h4><div class="block-inner"><div class="residual-loop loop-a"><span>residual x</span></div><div class="residual-loop loop-b"><span>residual x₁</span></div><div id="sp-norm1" class="micro-node norm">LayerNorm 1</div><i>↓</i><div id="sp-adaln1" class="micro-node adaln">Action-AdaLN 1<small>shift/scale_msa</small></div><i>↓</i><button id="sp-attn" type="button" class="micro-node attention detail-node" data-detail="spatialAttn">Spatial Self-Attention<small>[B·T,S,C] · 16 heads</small></button><i>↓</i><div id="sp-gate1" class="micro-node gate">× gate_msa</div><i>↓</i><div id="sp-add1" class="plus">＋</div><i>↓ x₁</i><div class="micro-node disabled">Text Cross-Attn：OFF</div><i>↓</i><div id="sp-norm2" class="micro-node norm">LayerNorm 2</div><i>↓</i><div id="sp-adaln2" class="micro-node adaln">Action-AdaLN 2<small>shift/scale_mlp</small></div><i>↓</i><button id="sp-mlp" type="button" class="micro-node mlp detail-node" data-detail="mlp">MLP<small>1152→4608→1152</small></button><i>↓</i><div id="sp-gate2" class="micro-node gate">× gate_mlp</div><i>↓</i><div id="sp-add2" class="plus">＋</div><i class="connector-gap" aria-hidden="true">↓</i><button id="spatial-output-x2" type="button" class="micro-node x2-output detail-node" data-detail="spatialX2"><b>① Spatial 输出 x₂</b><small>[B,T,S,1152]</small><em>已融合 action</em></button></div></article>
+            <div class="spatial-temporal-bridge" aria-label="Spatial 输出到 Temporal 输入的数据变换">
+              <span>HIDDEN STATE HANDOFF</span>
+              <button id="spatial-temporal-handoff" type="button" class="bridge-node detail-node" data-detail="temporalHandoff"><b>② x₂ 直接传递</b><code>[B,T,S,1152]<br>shape 不变</code><small>不是新 layer<br>action 影响保留在数值中</small></button>
+            </div>
+            <article id="temporal-block" class="single-block temporal-block"><h4>Temporal Block ℓ <span>global t</span></h4><div class="block-inner temporal-inner"><div class="residual-loop loop-a"><span>residual x₂</span></div><div class="residual-loop loop-b"><span>residual z₁</span></div><button id="temporal-input-x2" type="button" class="micro-node x2-input detail-node" data-detail="temporalX2"><b>③ Temporal 输入 x₂</b><small>[B,T,S,1152]</small><em>携带 action 影响</em></button><i class="connector-gap" aria-hidden="true">↓</i><div id="tm-norm1" class="micro-node norm">LayerNorm 1</div><i>↓</i><div id="tm-adaln1" class="micro-node timestep-adaln">Timestep-AdaLN 1</div><i>↓</i><div id="tm-attn-reshape" class="micro-node reshape-node">rearrange for time<small>B,T,S,C → B·S,T,C</small></div><i>↓</i><button id="tm-attn" type="button" class="micro-node temporal-attention detail-node" data-detail="temporalAttn">Causal Temporal Attention<small>[B·S,T,C] · RoPE · causal</small></button><i>↓</i><div id="tm-attn-restore" class="micro-node reshape-node">restore grid<small>B·S,T,C → B,T,S,C</small></div><i>↓</i><div id="tm-gate1" class="micro-node gate">× gate_msa(t)</div><i>↓</i><div id="tm-add1" class="plus">＋</div><i>↓ z₁</i><div id="tm-norm2" class="micro-node norm">LayerNorm 2</div><i>↓</i><div id="tm-adaln2" class="micro-node timestep-adaln">Timestep-AdaLN 2</div><i>↓</i><button id="tm-mlp" type="button" class="micro-node mlp detail-node" data-detail="mlp">MLP<small>1152→4608→1152</small></button><i>↓</i><div id="tm-gate2" class="micro-node gate">× gate_mlp(t)</div><i>↓</i><div id="tm-add2" class="plus">＋</div><i>↓ Pair ℓ+1</i></div></article>
+          </div>
+        </section>
+
+        <section class="canvas-panel attention-panel" aria-labelledby="attention-title">
+          <header><small>ZOOM FROM SELF-ATTENTION</small><h3 id="attention-title">④ Attention 内部 Q / K / V</h3><div class="attention-mode" role="group" aria-label="Attention 模式"><button type="button" data-attention="spatial" class="is-active" aria-pressed="true">Spatial</button><button type="button" data-attention="temporal" aria-pressed="false">Temporal causal</button></div></header>
+          <div class="attention-inner"><div id="attn-expanded-input" class="attn-box input"><b>hidden h</b><code id="attn-input">[B·T,S,1152]</code></div><i>↓ Linear 1152 → 3456</i><div class="qkv-row"><div class="attn-box q"><b>Query</b><code id="q-shape">[B·T,16,S,72]</code></div><div class="attn-box k"><b>Key</b><code id="k-shape">[B·T,16,S,72]</code></div><div class="attn-box v"><b>Value</b><code id="v-shape">[B·T,16,S,72]</code></div></div><div class="attn-ops"><span>Q/K RMSNorm</span><span id="rope-state">Spatial：无 RoPE</span><span>Q × 1/√72</span></div><i>↓</i><div class="score-row"><div class="attn-box"><b>QKᵀ scores</b><code id="score-shape">[B·T,16,S,S]</code></div><b>＋</b><div class="attn-box mask is-off" id="causal-mask"><b>Causal mask</b><code>OFF</code></div></div><i>↓ float32 Softmax</i><div class="attn-box weights"><b>Attention weights @ V</b><code id="weighted-shape">[B·T,16,S,72]</code></div><i>↓ transpose + concat heads</i><div class="attn-box output"><b>Output Linear</b><code id="attn-output">[B·T,S,1152]</code></div></div><p>源码：layers/blocks.py · Attention L132–226</p>
+        </section>
+
+        <section class="canvas-panel mlp-panel" aria-labelledby="mlp-title"><header><small>ZOOM FROM MLP</small><h3 id="mlp-title">⑤ Feed-Forward / MLP 内部</h3></header><div class="mlp-inner"><div id="mlp-expanded-input" class="mlp-box hidden"><b>hidden</b><code>[…,1152]</code></div><i>→</i><div class="mlp-box fc1"><b>fc1 Linear</b><code>1152 → 4608</code></div><i>→</i><div class="mlp-box act"><b>approx GELU</b><code>x·σ(1.702x)</code></div><i>→</i><div class="mlp-box fc2"><b>fc2 Linear</b><code>4608 → 1152</code></div><i>→</i><div class="mlp-box hidden"><b>MLP output</b><code>[…,1152]</code></div></div><p>AdaLN 在 MLP 前，gate_mlp 与 residual add 在 MLP 后；它们不属于 timm.Mlp 类内部。</p></section>
+
+        <section class="canvas-panel final-panel" aria-labelledby="final-title"><header><small>ZOOM FROM END OF PAIR 28</small><h3 id="final-title">⑥ Final Layer → unpatchify → 输出 latent</h3></header><div class="final-flow"><div id="final-expanded-input" class="final-box hidden"><b>28 对后 hidden</b><code>[B,12,S,1152]</code></div><div id="final-expanded-norm" class="final-box norm"><b>Final LayerNorm</b><code>affine=False</code></div><div id="final-expanded-adaln" class="final-box adaln"><b>Final AdaLN(t)</b><code>(1+scale)·LN(x)+shift</code></div><div id="final-expanded-linear" class="final-box projection"><b>Linear</b><code>1152→1·2·2·Cout</code></div><div id="final-expanded-patch" class="final-box projection"><b>patch prediction</b><code>[B,12,S,4·Cout]</code></div><div id="final-expanded-unpatchify" class="final-box projection"><b>unpatchify</b><code>B T (H·W) (1·2·2·Cout)<br>→ B Cout T Hx Wx</code></div><div id="final-expanded-output" class="final-box output"><b>float32 output</b><code>[B,Cout,12,Hx,Wx]</code></div></div><div class="final-notes"><span><b>Cout=8</b> 当 pred_sigma=True，否则 4</span><span>输出仍是 latent 预测，不是直接 RGB</span><span>源码：T2IFinalLayer L723–780；stdit3.py L495–520</span></div></section>
+
+        <aside class="canvas-inspector" aria-live="polite"><span id="detail-kind">MODEL INPUT</span><h3 id="detail-title">噪声 latent xₜ</h3><p id="detail-description">这是 STDiT3.forward 真正接收的视频张量；RGB 到 latent 的编码发生在模型外部。</p><code id="detail-shape">[B,4,12,Hx,Wx]</code><small id="detail-source">WMPO stdit3.py · L412–421</small></aside>
+      </div>
+    </div>
+  </main>
+  <script src="assets/end-to-end.js"></script>
+</body>
+</html>

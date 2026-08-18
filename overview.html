@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>STDiT3 完整架构总览</title>
+  <link rel="stylesheet" href="assets/overview.css">
+</head>
+<body>
+  <a class="skip-link" href="#diagram-viewport">跳到架构画布</a>
+
+  <header class="overview-header">
+    <div class="title-group">
+      <div class="detail-links">
+        <a class="back-link" href="index.html">← 八步教学版</a>
+        <a class="back-link end-to-end-link" href="end-to-end.html">输入到输出精细图 →</a>
+        <a class="back-link toy-detail-link" href="adaln-toy.html">Action-AdaLN 数值手算 →</a>
+        <a class="back-link block-detail-link" href="block-detail.html">Block 内部精细图 →</a>
+      </div>
+      <div>
+        <p class="eyebrow">OPEN-SORA v1.3 × WMPO</p>
+        <h1>STDiT3 完整架构地图</h1>
+        <p class="subtitle">从输入 latent、条件编码、56 个 Transformer Block 到最终输出，一张可缩放的大图看完整网络。</p>
+      </div>
+    </div>
+
+    <div class="top-controls" aria-label="显示模式">
+      <div class="segmented" role="group" aria-label="模型视图">
+        <button type="button" class="view-button" data-view="native" aria-pressed="false">原生</button>
+        <button type="button" class="view-button" data-view="wmpo" aria-pressed="false">WMPO</button>
+        <button type="button" class="view-button is-active" data-view="compare" aria-pressed="true">对比</button>
+      </div>
+      <label class="shape-toggle">
+        <input id="shape-toggle" type="checkbox" checked>
+        <span>显示张量形状</span>
+      </label>
+    </div>
+  </header>
+
+  <main class="overview-shell">
+    <nav class="chapter-nav" aria-label="架构章节">
+      <p class="nav-label">ARCHITECTURE</p>
+      <button type="button" class="chapter-button is-active" data-focus="full">
+        <span>00</span><strong>完整地图</strong><small>全局对照</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="inputs">
+        <span>01</span><strong>输入</strong><small>latent / action / text</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="tokens">
+        <span>02</span><strong>视频 Token</strong><small>PatchEmbed3D</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="conditions">
+        <span>03</span><strong>条件系统</strong><small>t / fps / text / action</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="spatial">
+        <span>04</span><strong>Spatial Block</strong><small>Action-AdaLN</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="temporal">
+        <span>05</span><strong>Temporal Block</strong><small>causal attention</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="backbone">
+        <span>06</span><strong>28 对主干</strong><small>56 blocks</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="output">
+        <span>07</span><strong>输出</strong><small>final + unpatchify</small>
+      </button>
+      <button type="button" class="chapter-button" data-focus="differences">
+        <span>08</span><strong>改动清单</strong><small>核心设计 / fork 差异</small>
+      </button>
+    </nav>
+
+    <section class="workspace" aria-label="架构工作区">
+      <div class="canvas-toolbar">
+        <div class="zoom-controls" role="group" aria-label="画布缩放">
+          <button type="button" id="zoom-out" aria-label="缩小">−</button>
+          <output id="zoom-value" for="zoom-range">50%</output>
+          <button type="button" id="zoom-in" aria-label="放大">＋</button>
+          <button type="button" id="fit-view">适合窗口</button>
+          <button type="button" id="reset-view">100%</button>
+        </div>
+        <p class="canvas-hint">拖动画布 · 滚轮缩放 · 点击模块查看细节</p>
+      </div>
+
+      <div id="diagram-viewport" class="diagram-viewport" tabindex="0" aria-label="可缩放 STDiT3 完整架构图">
+        <div id="diagram-canvas" class="diagram-canvas">
+          <svg id="connector-layer" class="connector-layer" width="2700" height="1700" viewBox="0 0 2700 1700" aria-hidden="true"></svg>
+          <div id="node-layer" class="node-layer"></div>
+        </div>
+
+        <div class="canvas-key" aria-label="架构颜色图例">
+          <span><i class="key-dot shared"></i>共享模块</span>
+          <span><i class="key-dot condition"></i>条件</span>
+          <span><i class="key-dot action"></i>WMPO 核心改造</span>
+          <span><i class="key-dot removed"></i>禁用</span>
+          <span><i class="key-dot drift"></i>fork 差异</span>
+        </div>
+
+        <div class="minimap" aria-hidden="true">
+          <div class="minimap-label">MAP</div>
+          <div class="minimap-world">
+            <div class="mini-lane native"></div>
+            <div class="mini-lane wmpo"></div>
+            <div class="mini-detail"></div>
+            <div id="minimap-window" class="minimap-window"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside id="inspector" class="inspector" aria-live="polite">
+      <div class="inspector-heading">
+        <p id="inspector-kind" class="inspector-kind">OVERVIEW</p>
+        <h2 id="inspector-title">完整模型地图</h2>
+      </div>
+      <p id="inspector-description" class="inspector-description"></p>
+
+      <dl class="inspector-facts">
+        <div>
+          <dt>输入</dt>
+          <dd id="inspector-input"></dd>
+        </div>
+        <div>
+          <dt>输出</dt>
+          <dd id="inspector-output"></dd>
+        </div>
+      </dl>
+
+      <div class="inspector-section">
+        <h3>关键计算</h3>
+        <code id="inspector-formula"></code>
+      </div>
+
+      <div class="inspector-section">
+        <h3>为什么重要</h3>
+        <p id="inspector-meaning"></p>
+      </div>
+
+      <div class="inspector-section source-section">
+        <h3>源码定位</h3>
+        <p id="inspector-source"></p>
+      </div>
+
+      <div class="inspector-footer">
+        <span id="inspector-class" class="classification">共享骨架</span>
+        <span id="inspector-count"></span>
+      </div>
+    </aside>
+  </main>
+
+  <section class="accessible-summary" aria-labelledby="summary-title">
+    <h2 id="summary-title">结构摘要</h2>
+    <p>原生 Open-Sora：16 通道 latent 经 PatchEmbed3D 后进入 28 对 Spatial/Temporal Block；timestep+fps 通过 AdaLN 调制，文本通过 Cross-Attention 注入。</p>
+    <p>WMPO：4 通道、12 帧 latent 与 8×7D action 输入；ActionEncoder 生成逐帧 Spatial AdaLN 条件，Temporal Attention 改为 causal，当前 world-model forward 禁用文本 Cross-Attention。</p>
+  </section>
+
+  <script src="assets/overview.js"></script>
+</body>
+</html>

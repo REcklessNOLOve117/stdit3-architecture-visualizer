@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Action-AdaLN 数值手算</title>
+  <link rel="stylesheet" href="assets/adaln-toy.css">
+</head>
+<body class="show-real">
+  <a class="skip-link" href="#lesson-stage">跳到当前步骤</a>
+
+  <header class="toy-header">
+    <div class="header-copy">
+      <a href="overview.html" class="back-link">← 返回完整架构图</a>
+      <div>
+        <p class="eyebrow">WMPO · ACTION CONDITIONING LAB</p>
+        <h1>Action-AdaLN：hidden size = 2 数值手算</h1>
+        <p>把真实的 1152 维计算缩成 2 维，逐项看清 action 在 Spatial Block 的两处注入。</p>
+      </div>
+    </div>
+    <label class="real-toggle">
+      <input id="real-toggle" type="checkbox" checked>
+      <span>同时显示真实模型维度</span>
+    </label>
+  </header>
+
+  <main class="toy-shell">
+    <nav class="step-nav" aria-label="手算步骤">
+      <p class="nav-label">STEP BY STEP</p>
+      <button type="button" class="step-button is-active" data-step="0"><span>01</span><strong>ActionEncoder</strong><small>2 → 4 → 2</small></button>
+      <button type="button" class="step-button" data-step="1"><span>02</span><strong>加 timestep</strong><small>得到逐帧 condition</small></button>
+      <button type="button" class="step-button" data-step="2"><span>03</span><strong>生成 6 组参数</strong><small>t_block: 2 → 12</small></button>
+      <button type="button" class="step-button" data-step="3"><span>04</span><strong>Video 与 LayerNorm</strong><small>两个 patch</small></button>
+      <button type="button" class="step-button" data-step="4"><span>05</span><strong>Attention 前 AdaLN</strong><small>shift_msa / scale_msa</small></button>
+      <button type="button" class="step-button" data-step="5"><span>06</span><strong>Attention 与 gate</strong><small>写回 residual</small></button>
+      <button type="button" class="step-button" data-step="6"><span>07</span><strong>MLP 前 AdaLN</strong><small>第二处注入</small></button>
+      <button type="button" class="step-button" data-step="7"><span>08</span><strong>进入 Temporal</strong><small>只有 x₂ 进入</small></button>
+      <button type="button" class="step-button" data-step="8"><span>09</span><strong>复用于 28 层</strong><small>共享 condition，层表不同</small></button>
+    </nav>
+
+    <section class="lesson" aria-label="Action-AdaLN 手算内容">
+      <div class="lesson-toolbar">
+        <div>
+          <span id="step-counter">1 / 9</span>
+          <strong id="step-title">ActionEncoder：把物理动作翻译成 condition</strong>
+        </div>
+        <div class="progress" role="progressbar" aria-label="学习进度" aria-valuemin="1" aria-valuemax="9" aria-valuenow="1">
+          <div id="progress-bar"></div>
+        </div>
+      </div>
+
+      <div id="lesson-stage" class="lesson-stage" tabindex="-1">
+        <article class="lesson-step is-active" data-step-panel="0">
+          <div class="step-heading">
+            <p>STEP 01 · ACTION ENCODER</p>
+            <h2><code>a=[1,2]</code> 如何变成 <code>eₐ=[1.795,0.747]</code></h2>
+            <span class="takeaway">这一阶段只编码 action，还没有接触 video token。</span>
+          </div>
+
+          <div class="flow-line five">
+            <div class="flow-node action"><small>输入 action</small><strong>[1, 2]</strong><em>2D</em></div>
+            <i>→</i>
+            <div class="flow-node"><small>Linear W₁</small><strong>[1, 2, 3, −1]</strong><em>2 → 4</em></div>
+            <i>→</i>
+            <div class="flow-node condition"><small>SiLU</small><strong>[0.731, 1.762,<br>2.858, −0.269]</strong><em>x·σ(x)</em></div>
+            <i>→</i>
+            <div class="flow-node"><small>Linear W₂</small><strong>[1.795, 0.747]</strong><em>4 → 2</em></div>
+          </div>
+
+          <div class="calc-grid">
+            <section class="calc-card">
+              <h3>第一层 Linear</h3>
+              <code>[a₁,a₂] → [a₁,a₂,a₁+a₂,a₁−a₂]</code>
+              <div class="equation">[1,2] → [1,2,3,−1]</div>
+            </section>
+            <section class="calc-card">
+              <h3>第二层 Linear</h3>
+              <code>e₁=.5z₁+.5z₃　e₂=.5z₂+.5z₄</code>
+              <div class="equation">eₐ = [1.795, 0.747]</div>
+            </section>
+          </div>
+
+          <div class="real-map">
+            <strong>真实 WMPO</strong><span>[B,8,7] → ActionEncoder(7→4608→1152) → prepend 4×NONE → [B,12,1152]</span>
+          </div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="1">
+          <div class="step-heading">
+            <p>STEP 02 · PER-FRAME CONDITION</p>
+            <h2>Action embedding 与 timestep embedding 逐元素相加</h2>
+            <span class="takeaway">相加的是两个 condition 向量，不是把 action 加进 video feature。</span>
+          </div>
+
+          <div class="merge-diagram">
+            <div class="merge-branch action"><small>ActionEncoder(aᵢ)</small><strong>[1.795, 0.747]</strong></div>
+            <div class="merge-branch condition"><small>TimestepEmbedder(t)</small><strong>[0.2, −0.1]</strong></div>
+            <div class="merge-symbol">＋</div>
+            <div class="merge-result"><small>第 i 帧 condition cᵢ</small><strong>[1.995, 0.647]</strong></div>
+          </div>
+
+          <div class="formula-block">
+            <span>逐帧公式</span>
+            <code>cᵢ = Eₜ(t) + Eₐ(aᵢ)</code>
+          </div>
+
+          <div class="frame-strip" aria-label="12 帧 action 对齐">
+            <div><b>frame 0</b><span>NONE</span></div><div><b>1</b><span>NONE</span></div><div><b>2</b><span>NONE</span></div><div><b>3</b><span>NONE</span></div>
+            <div class="future"><b>4</b><span>a₀</span></div><div class="future"><b>5</b><span>a₁</span></div><div class="future"><b>6</b><span>a₂</span></div><div class="future"><b>7</b><span>a₃</span></div>
+            <div class="future"><b>8</b><span>a₄</span></div><div class="future"><b>9</b><span>a₅</span></div><div class="future"><b>10</b><span>a₆</span></div><div class="future"><b>11</b><span>a₇</span></div>
+          </div>
+
+          <div class="real-map"><strong>真实 WMPO</strong><span>[B,1152] repeat 到 12 帧，再与 [B,12,1152] action embedding 相加。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="2">
+          <div class="step-heading">
+            <p>STEP 03 · t_block</p>
+            <h2><code>c=[1.995,0.647]</code> 投影成两条残差支路的 6 组参数</h2>
+            <span class="takeaway">输出是调制参数，不是一个新的 feature layer。</span>
+          </div>
+
+          <div class="parameter-source">
+            <div class="flow-node condition"><small>condition cᵢ</small><strong>[1.995, 0.647]</strong><em>2D</em></div>
+            <i>→</i>
+            <div class="flow-node action"><small>t_block</small><strong>2 → 12</strong><em>6 × hidden</em></div>
+            <i>→</i>
+            <div class="split-dot">分成 6 组</div>
+          </div>
+
+          <div class="parameter-groups">
+            <section>
+              <h3>① Self-Attention 支路</h3>
+              <div class="parameter-row"><span>shift_msa</span><code>[ 0.10, −0.20 ]</code><small>加法偏移 β</small></div>
+              <div class="parameter-row"><span>scale_msa</span><code>[ 0.05, 0.10 ]</code><small>乘法缩放 γ</small></div>
+              <div class="parameter-row"><span>gate_msa</span><code>[ 0.80, 0.70 ]</code><small>残差门控 g</small></div>
+            </section>
+            <section>
+              <h3>② MLP 支路</h3>
+              <div class="parameter-row"><span>shift_mlp</span><code>[ −0.10, 0.05 ]</code><small>加法偏移 β</small></div>
+              <div class="parameter-row"><span>scale_mlp</span><code>[ 0.02, −0.03 ]</code><small>乘法缩放 γ</small></div>
+              <div class="parameter-row"><span>gate_mlp</span><code>[ 0.60, 0.90 ]</code><small>残差门控 g</small></div>
+            </section>
+          </div>
+
+          <div class="real-map"><strong>真实 WMPO</strong><span>t_block: 1152 → 6912 = 6×1152，输出形状 [B,12,6,1152]。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="3">
+          <div class="step-heading">
+            <p>STEP 04 · VIDEO BRANCH</p>
+            <h2>另一条支路：两个空间 patch 先做 LayerNorm</h2>
+            <span class="takeaway">这是 PatchEmbed 后的 Transformer hidden，不是 RGB 像素。</span>
+          </div>
+
+          <div class="matrix-flow">
+            <div class="matrix-card">
+              <small>输入 video feature x</small>
+              <table><tr><td>1</td><td>3</td></tr><tr><td>2</td><td>0</td></tr></table>
+              <em>2 patches × C=2</em>
+            </div>
+            <i>→</i>
+            <div class="matrix-card norm">
+              <small>LN(x)</small>
+              <table><tr><td>−1</td><td>1</td></tr><tr><td>1</td><td>−1</td></tr></table>
+              <em>每个 patch 沿 C 归一化</em>
+            </div>
+          </div>
+
+          <div class="patch-calc">
+            <div><strong>patch 0</strong><code>[1,3]　μ=2, σ≈1　→　[−1,1]</code></div>
+            <div><strong>patch 1</strong><code>[2,0]　μ=1, σ≈1　→　[1,−1]</code></div>
+          </div>
+
+          <div class="real-map"><strong>真实 WMPO</strong><span>x 的符号形状为 [B,T,S,1152]；LayerNorm 设置 affine=False。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="4">
+          <div class="step-heading">
+            <p>STEP 05 · ACTION-ADALN BEFORE ATTENTION</p>
+            <h2>第一处真正注入：用 <code>shift_msa / scale_msa</code> 改写 LN(x)</h2>
+            <span class="takeaway">同一帧的参数广播给这一帧的所有 S 个 patch。</span>
+          </div>
+
+          <div class="broadcast-diagram">
+            <div class="parameter-stack">
+              <div><span>scale_msa</span><code>[0.05, 0.10]</code></div>
+              <div><span>shift_msa</span><code>[0.10, −0.20]</code></div>
+              <b>沿 S 广播 ↓</b>
+            </div>
+            <div class="patch-results">
+              <div class="patch-equation"><b>patch 0</b><code>[−1,1] × [1.05,1.10] + [0.10,−0.20]</code><strong>[−0.95, 0.90]</strong></div>
+              <div class="patch-equation"><b>patch 1</b><code>[1,−1] × [1.05,1.10] + [0.10,−0.20]</code><strong>[1.15, −1.30]</strong></div>
+            </div>
+          </div>
+
+          <div class="formula-block large"><span>AdaLN₁</span><code>h_attn = (1 + scale_msa) · LN₁(x) + shift_msa</code></div>
+
+          <div class="matrix-card result-matrix">
+            <small>Action-conditioned feature h_attn</small>
+            <table><tr><td>−0.95</td><td>0.90</td></tr><tr><td>1.15</td><td>−1.30</td></tr></table>
+            <em>Action 第一次真正改变 video hidden</em>
+          </div>
+
+          <div class="real-map"><strong>真实 WMPO</strong><span>shift/scale: [B,T,1,1152]，在每帧内部沿 S 个 spatial tokens 广播。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="5">
+          <div class="step-heading">
+            <p>STEP 06 · SELF-ATTENTION + GATE</p>
+            <h2>改变后的 hidden 生成 Q/K/V，Attention 输出再由 gate_msa 控制</h2>
+            <span class="takeaway">shift/scale 改变“算什么”，gate 决定“写回多少”。</span>
+          </div>
+
+          <div class="qkv-flow">
+            <div class="flow-node action"><small>h_attn</small><strong>Action-conditioned</strong></div><i>→</i>
+            <div class="qkv-box"><b>Q=hWQ</b><b>K=hWK</b><b>V=hWV</b></div><i>→</i>
+            <div class="flow-node"><small>Spatial Attention</small><strong>patch ↔ patch</strong></div>
+          </div>
+
+          <div class="matrix-equation-row">
+            <div class="matrix-card"><small>Attn(h_attn)</small><table><tr><td>0.4</td><td>0.6</td></tr><tr><td>0.7</td><td>0.2</td></tr></table></div>
+            <div class="operator">⊙<small>gate_msa<br>[0.8,0.7]</small></div>
+            <div class="matrix-card"><small>gated attention</small><table><tr><td>0.32</td><td>0.42</td></tr><tr><td>0.56</td><td>0.14</td></tr></table></div>
+            <div class="operator">＋<small>residual x</small></div>
+            <div class="matrix-card result"><small>x₁</small><table><tr><td>1.32</td><td>3.42</td></tr><tr><td>2.56</td><td>0.14</td></tr></table></div>
+          </div>
+
+          <div class="formula-block large"><span>Attention 残差</span><code>x₁ = x + gate_msa · SpatialAttention(h_attn)</code></div>
+          <div class="real-map"><strong>关键含义</strong><span>Action 通过 h_attn 改变 Q/K/V 和 attention matrix，并通过 gate_msa 控制结果写回 residual stream 的强度。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="6">
+          <div class="step-heading">
+            <p>STEP 07 · ACTION-ADALN BEFORE MLP</p>
+            <h2>第二处注入：对 x₁ 再做 LN₂ 与另一组 Action-AdaLN</h2>
+            <span class="takeaway">Attention 和 MLP 使用不同的 shift、scale、gate。</span>
+          </div>
+
+          <div class="branch-pipeline">
+            <div class="flow-node"><small>第一支路输出</small><strong>x₁</strong></div><i>→</i>
+            <div class="flow-node"><small>Pre-Norm</small><strong>LN₂(x₁)</strong></div><i>→</i>
+            <div class="flow-node action"><small>Action-AdaLN₂</small><strong>shift_mlp<br>scale_mlp</strong></div><i>→</i>
+            <div class="flow-node"><small>Channel MLP</small><strong>2 → 4 → 2</strong></div><i>→</i>
+            <div class="flow-node action"><small>gate + residual</small><strong>×gate_mlp + x₁</strong></div>
+          </div>
+
+          <div class="formula-stack">
+            <code>h_mlp = (1 + scale_mlp) · LN₂(x₁) + shift_mlp</code>
+            <code>x₂ = x₁ + gate_mlp · MLP(h_mlp)</code>
+          </div>
+
+          <div class="two-injection-summary">
+            <section><b>注入点 ①</b><span>Self-Attention 前</span><code>shift_msa / scale_msa / gate_msa</code></section>
+            <section><b>注入点 ②</b><span>MLP 前</span><code>shift_mlp / scale_mlp / gate_mlp</code></section>
+          </div>
+
+          <div class="real-map"><strong>一个 Spatial Block 完成</strong><span>输出 x₂ 仍为 [B,T,S,1152]，张量形状不变，内容已被 action 条件化。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="7">
+          <div class="step-heading">
+            <p>STEP 08 · SPATIAL → TEMPORAL</p>
+            <h2>进入 Temporal Block 的是 Spatial 输出 x₂，不是 Action-AdaLN 参数</h2>
+            <span class="takeaway">Temporal 的直接 AdaLN condition 仍是全局 timestep。</span>
+          </div>
+
+          <div class="temporal-entry">
+            <div class="spatial-block-box">
+              <small>Action-conditioned Spatial Block</small>
+              <strong>x → Attention 支路 → MLP 支路 → x₂</strong>
+              <em>直接使用 action 生成的 6 组参数</em>
+            </div>
+            <i>→</i>
+            <div class="reshape-box">
+              <small>Rearrange</small>
+              <strong>[B,T,S,C]</strong><b>↓</b><strong>[B·S,T,C]</strong>
+            </div>
+            <i>→</i>
+            <div class="temporal-block-box">
+              <small>Causal Temporal Block</small>
+              <strong>同一空间位置沿 T 注意力</strong>
+              <em>直接 condition：t_t = t_block(Eₜ(t))</em>
+            </div>
+          </div>
+
+          <div class="not-entering">
+            <div><b>进入 Temporal</b><span>x₂：已经包含 action 影响的 hidden state</span></div>
+            <div><b>不直接进入 Temporal</b><span>shift_msa / scale_msa / gate_msa / shift_mlp / scale_mlp / gate_mlp</span></div>
+          </div>
+
+          <div class="formula-block large"><span>第 1 组 Block</span><code>x₁ = Temporal₁( Spatial₁(x₀, Action), timestep )</code></div>
+          <div class="real-map"><strong>Temporal 形状</strong><span>[B,12,S,1152] → [B·S,12,1152]；当前 WMPO 使用 causal temporal attention。</span></div>
+        </article>
+
+        <article class="lesson-step" data-step-panel="8">
+          <div class="step-heading">
+            <p>STEP 09 · 28 LAYERS</p>
+            <h2>ActionEncoder 与 t_block 算一次；condition 复用于 28 个 Spatial Block</h2>
+            <span class="takeaway">共享的是 pᵢ，每层还会加自己的 scale_shift_tableₗ。</span>
+          </div>
+
+          <div class="shared-condition">
+            <div class="condition-source"><small>每帧共享 condition</small><strong>pᵢ = t_block(Eₜ(t)+Eₐ(aᵢ))</strong><em>[6,C]</em></div>
+            <div class="condition-bus"><span></span><b>同一个 pᵢ 广播到 28 层</b></div>
+          </div>
+
+          <div class="layer-sequence">
+            <section><div class="table-chip">＋ Table₁</div><div class="layer spatial">Spatial 1<small>Pᵢ,₁=pᵢ+R₁</small></div><i>→</i><div class="layer temporal">Temporal 1<small>timestep</small></div></section>
+            <section><div class="table-chip">＋ Table₂</div><div class="layer spatial">Spatial 2<small>Pᵢ,₂=pᵢ+R₂</small></div><i>→</i><div class="layer temporal">Temporal 2<small>timestep</small></div></section>
+            <div class="omitted">⋯　Blocks 3–27　⋯</div>
+            <section><div class="table-chip">＋ Table₂₈</div><div class="layer spatial">Spatial 28<small>Pᵢ,₂₈=pᵢ+R₂₈</small></div><i>→</i><div class="layer temporal">Temporal 28<small>timestep</small></div></section>
+          </div>
+
+          <div class="formula-stack final-formulas">
+            <code>[β,γ,g]ᵢ,ₗ = pᵢ + scale_shift_tableₗ</code>
+            <code>xᵐᵒᵈᵢ,ₗ = (1+γᵢ,ₗ)·LN(xᵢ,ₗ)+βᵢ,ₗ</code>
+          </div>
+
+          <div class="final-summary">
+            <b>Action condition 是逐帧共享的</b><span>同一 pᵢ 被传给 28 个 Spatial Blocks。</span>
+            <b>实际调制是 layer-specific 的</b><span>因为每层拥有不同的 scale_shift_tableₗ。</span>
+          </div>
+
+          <div class="real-map"><strong>真实主干</strong><span>[Spatial(action-conditioned) → Temporal(causal)] × 28 → Final Layer。</span></div>
+        </article>
+      </div>
+
+      <footer class="lesson-footer">
+        <button id="prev-step" type="button">← 上一步</button>
+        <p>键盘 ← / → 也可以切换</p>
+        <button id="next-step" type="button">下一步 →</button>
+      </footer>
+    </section>
+
+    <aside class="concept-aside">
+      <p class="aside-label">始终记住</p>
+      <h2>两条并行支路</h2>
+      <div class="aside-lane action">
+        <b>Condition 支路</b>
+        <span>Action → Encoder → +timestep → 6 组参数</span>
+      </div>
+      <div class="aside-lane video">
+        <b>Video 支路</b>
+        <span>x → LN → AdaLN → Attention / MLP</span>
+      </div>
+      <div class="aside-merge">
+        <span>只在 Spatial Block 内部相遇</span>
+        <strong>Action 不直接加到 video token</strong>
+      </div>
+      <dl>
+        <div><dt>Attention 前</dt><dd>shift_msa / scale_msa</dd></div>
+        <div><dt>Attention 输出</dt><dd>gate_msa</dd></div>
+        <div><dt>MLP 前</dt><dd>shift_mlp / scale_mlp</dd></div>
+        <div><dt>MLP 输出</dt><dd>gate_mlp</dd></div>
+      </dl>
+      <div class="source-note">
+        <b>源码范围</b>
+        <code>WMPO/.../stdit3.py<br>L141–205, L448–487</code>
+      </div>
+    </aside>
+  </main>
+
+  <script src="assets/adaln-toy.js"></script>
+</body>
+</html>

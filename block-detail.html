@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>STDiT3 Block 内部精细架构</title>
+  <link rel="stylesheet" href="assets/block-detail.css">
+</head>
+<body>
+  <a class="skip-link" href="#diagram-stage">跳到 Block 架构图</a>
+
+  <header class="detail-header">
+    <div class="header-main">
+      <a href="overview.html" class="back-link">← 返回完整架构图</a>
+      <div>
+        <p class="eyebrow">MODULE-LEVEL SCHEMATIC</p>
+        <h1>STDiT3 Block 内部精细架构</h1>
+        <p>按 Norm、AdaLN、Attention、gate、residual、MLP 的粒度展开；箭头方向从下到上。</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="toy-link" href="end-to-end.html">查看输入到输出 →</a>
+      <a class="toy-link" href="adaln-toy.html">hidden=2 数值手算 →</a>
+    </div>
+  </header>
+
+  <main class="detail-shell">
+    <nav class="view-tabs" aria-label="Block 视图">
+      <button type="button" class="view-tab is-active" data-view="spatial" aria-pressed="true">
+        <span>01</span><strong>WMPO Spatial Block</strong><small>Action-AdaLN 两处注入</small>
+      </button>
+      <button type="button" class="view-tab" data-view="temporal" aria-pressed="false">
+        <span>02</span><strong>WMPO Temporal Block</strong><small>causal temporal attention</small>
+      </button>
+      <button type="button" class="view-tab" data-view="native" aria-pressed="false">
+        <span>03</span><strong>原生 Open-Sora</strong><small>text cross-attention</small>
+      </button>
+    </nav>
+
+    <section id="diagram-stage" class="diagram-stage" tabindex="-1" aria-label="Block 精细架构图">
+      <div class="diagram-toolbar">
+        <div>
+          <span id="view-kind">WMPO SPATIAL</span>
+          <strong id="view-title">Action-conditioned Spatial Transformer Block</strong>
+        </div>
+        <p>点击彩色模块查看公式与张量形状</p>
+      </div>
+
+      <article class="diagram-view is-active" data-view-panel="spatial">
+        <svg class="block-svg" viewBox="0 -60 760 1280" role="img" aria-labelledby="spatial-title spatial-desc">
+          <title id="spatial-title">WMPO Spatial Transformer Block 精细结构</title>
+          <desc id="spatial-desc">从底部输入 x 开始，依次经过 LayerNorm、Action-AdaLN、Spatial Multi-Head Self-Attention、gate 和 residual，再经过第二个 LayerNorm、Action-AdaLN、MLP、gate 和 residual，输出 x2。</desc>
+          <defs>
+            <marker id="spatial-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"></path></marker>
+            <marker id="spatial-cond-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"></path></marker>
+          </defs>
+
+          <rect class="block-boundary spatial-boundary" x="245" y="75" width="455" height="1080" rx="22"></rect>
+          <text class="block-label" x="268" y="108">Spatial Block ℓ　× 28</text>
+
+          <path class="main-path" d="M472 1155 V1098 M472 1028 V984 M472 914 V870 M472 800 V756 M472 686 V643 M472 573 V526 M472 474 V458 M472 402 V430 M472 360 V316 M472 246 V232 M472 162 V146 M472 82 V70 M472 18 V8"></path>
+
+          <g class="diagram-module input-module" tabindex="0" role="button" data-key="spatial_input">
+            <rect x="350" y="1150" width="244" height="58" rx="11"></rect>
+            <text x="472" y="1175">输入 x</text><text class="shape" x="472" y="1195">[B,T,S,C]</text>
+          </g>
+
+          <g class="diagram-module norm-module" tabindex="0" role="button" data-key="spatial_norm1">
+            <rect x="340" y="1028" width="264" height="70" rx="11"></rect>
+            <text x="472" y="1058">LayerNorm 1</text><text class="shape" x="472" y="1080">affine=False</text>
+          </g>
+
+          <g class="diagram-module adaln-module" tabindex="0" role="button" data-key="spatial_adaln1">
+            <rect x="315" y="914" width="314" height="70" rx="11"></rect>
+            <text x="472" y="943">Action-AdaLN 1</text><text class="shape" x="472" y="966">(1+scale_msa)·LN₁(x)+shift_msa</text>
+          </g>
+
+          <g class="diagram-module reshape-module" tabindex="0" role="button" data-key="spatial_reshape_in">
+            <rect x="350" y="800" width="244" height="70" rx="11"></rect>
+            <text x="472" y="829">Rearrange</text><text class="shape" x="472" y="852">[B,T,S,C] → [B·T,S,C]</text>
+          </g>
+
+          <g class="diagram-module attention-module" tabindex="0" role="button" data-key="spatial_attention">
+            <rect x="315" y="686" width="314" height="70" rx="11"></rect>
+            <text x="472" y="715">Spatial Multi-Head Self-Attention</text><text class="shape" x="472" y="738">16 heads · patch ↔ patch within each frame</text>
+          </g>
+
+          <g class="diagram-module reshape-module" tabindex="0" role="button" data-key="spatial_reshape_out">
+            <rect x="350" y="573" width="244" height="70" rx="11"></rect>
+            <text x="472" y="602">Rearrange back</text><text class="shape" x="472" y="625">[B·T,S,C] → [B,T,S,C]</text>
+          </g>
+
+          <g class="diagram-module gate-module" tabindex="0" role="button" data-key="spatial_gate_msa">
+            <rect x="360" y="474" width="224" height="52" rx="26"></rect>
+            <text x="472" y="506">× gate_msa</text>
+          </g>
+
+          <g class="add-node" aria-label="Attention residual add"><circle cx="472" cy="430" r="28"></circle><text x="472" y="439">＋</text></g>
+          <path class="residual-path" d="M350 1179 H674 V430 H503"></path>
+          <text class="residual-label" x="630" y="777" transform="rotate(-90 630 777)">residual x</text>
+
+          <g class="diagram-module disabled-module" tabindex="0" role="button" data-key="spatial_cross_off">
+            <rect x="360" y="360" width="224" height="70" rx="11"></rect>
+            <text x="472" y="389">Text Cross-Attention</text><text class="shape" x="472" y="412">OFF · forward 中注释</text>
+          </g>
+
+          <g class="diagram-module norm-module" tabindex="0" role="button" data-key="spatial_norm2">
+            <rect x="340" y="246" width="264" height="70" rx="11"></rect>
+            <text x="472" y="276">LayerNorm 2</text><text class="shape" x="472" y="298">对 x₁ 做 Pre-Norm</text>
+          </g>
+
+          <g class="diagram-module adaln-module" tabindex="0" role="button" data-key="spatial_adaln2">
+            <rect x="315" y="162" width="314" height="70" rx="11"></rect>
+            <text x="472" y="191">Action-AdaLN 2</text><text class="shape" x="472" y="214">(1+scale_mlp)·LN₂(x₁)+shift_mlp</text>
+          </g>
+
+          <g class="diagram-module mlp-module" tabindex="0" role="button" data-key="spatial_mlp">
+            <rect x="340" y="82" width="264" height="64" rx="11"></rect>
+            <text x="472" y="110">MLP</text><text class="shape" x="472" y="131">1152 → 4608 → 1152</text>
+          </g>
+
+          <g class="diagram-module gate-module" tabindex="0" role="button" data-key="spatial_gate_mlp">
+            <rect x="360" y="18" width="224" height="52" rx="26"></rect>
+            <text x="472" y="50">× gate_mlp</text>
+          </g>
+          <g class="add-node output-add" aria-label="MLP residual add"><circle cx="472" cy="-20" r="28"></circle><text x="472" y="-11">＋</text></g>
+          <path class="residual-path top-residual" d="M503 430 H730 V-20 H503"></path>
+
+          <g class="condition-source" tabindex="0" role="button" data-key="spatial_condition">
+            <rect x="22" y="1050" width="190" height="100" rx="13"></rect>
+            <text x="117" y="1078">逐帧 condition pᵢ</text><text class="shape" x="117" y="1101">t_block(Eₜ(t)+Eₐ(aᵢ))</text><text class="shape" x="117" y="1124">＋ layer table Rℓ</text>
+          </g>
+          <path class="condition-bus" d="M117 1050 V166"></path>
+          <text class="condition-label" x="82" y="760" transform="rotate(-90 82 760)">同一帧参数沿 S 广播</text>
+
+          <g class="param-chip" tabindex="0" role="button" data-key="spatial_params_msa"><rect x="18" y="900" width="198" height="68" rx="10"></rect><text x="117" y="927">shift_msa / scale_msa</text><text class="shape" x="117" y="950">→ Attention 前 AdaLN</text></g>
+          <path class="condition-path" d="M216 934 H315"></path>
+
+          <g class="param-chip" tabindex="0" role="button" data-key="spatial_gate_msa"><rect x="42" y="474" width="150" height="52" rx="10"></rect><text x="117" y="506">gate_msa</text></g>
+          <path class="condition-path" d="M192 500 H360"></path>
+
+          <g class="param-chip" tabindex="0" role="button" data-key="spatial_params_mlp"><rect x="18" y="162" width="198" height="68" rx="10"></rect><text x="117" y="189">shift_mlp / scale_mlp</text><text class="shape" x="117" y="212">→ MLP 前 AdaLN</text></g>
+          <path class="condition-path" d="M216 196 H315"></path>
+
+          <g class="param-chip" tabindex="0" role="button" data-key="spatial_gate_mlp"><rect x="42" y="18" width="150" height="52" rx="10"></rect><text x="117" y="50">gate_mlp</text></g>
+          <path class="condition-path" d="M192 44 H360"></path>
+
+          <text class="output-label" x="472" y="-50">输出 x₂ → Temporal Block</text>
+        </svg>
+      </article>
+
+      <article class="diagram-view" data-view-panel="temporal" hidden>
+        <svg class="block-svg" viewBox="0 0 760 1220" role="img" aria-labelledby="temporal-title temporal-desc">
+          <title id="temporal-title">WMPO Temporal Transformer Block 精细结构</title>
+          <desc id="temporal-desc">输入为 Spatial Block 输出 x2，Temporal Block 使用全局 timestep AdaLN 条件，经过 causal temporal attention、gate、residual 和 MLP。</desc>
+          <defs>
+            <marker id="temporal-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"></path></marker>
+          </defs>
+
+          <rect class="block-boundary temporal-boundary" x="245" y="75" width="455" height="1080" rx="22"></rect>
+          <text class="block-label" x="268" y="108">Temporal Block ℓ　× 28</text>
+          <path class="main-path temporal-main" d="M472 1155 V1098 M472 1028 V984 M472 914 V870 M472 800 V756 M472 686 V643 M472 573 V526 M472 474 V430 M472 360 V316 M472 246 V202 M472 132 V82"></path>
+
+          <g class="diagram-module input-module" tabindex="0" role="button" data-key="temporal_input"><rect x="350" y="1150" width="244" height="58" rx="11"></rect><text x="472" y="1175">输入 x₂</text><text class="shape" x="472" y="1195">来自 Spatial Block</text></g>
+          <g class="diagram-module norm-module" tabindex="0" role="button" data-key="temporal_norm1"><rect x="340" y="1028" width="264" height="70" rx="11"></rect><text x="472" y="1058">LayerNorm 1</text><text class="shape" x="472" y="1080">affine=False</text></g>
+          <g class="diagram-module adaln-module temporal-adaln" tabindex="0" role="button" data-key="temporal_adaln1"><rect x="315" y="914" width="314" height="70" rx="11"></rect><text x="472" y="943">Timestep-AdaLN 1</text><text class="shape" x="472" y="966">无直接 action embedding</text></g>
+          <g class="diagram-module reshape-module" tabindex="0" role="button" data-key="temporal_reshape_in"><rect x="350" y="800" width="244" height="70" rx="11"></rect><text x="472" y="829">Rearrange</text><text class="shape" x="472" y="852">[B,T,S,C] → [B·S,T,C]</text></g>
+          <g class="diagram-module attention-module temporal-attention" tabindex="0" role="button" data-key="temporal_attention"><rect x="315" y="686" width="314" height="70" rx="11"></rect><text x="472" y="715">Causal Temporal Self-Attention</text><text class="shape" x="472" y="738">16 heads · past → present</text></g>
+          <g class="diagram-module reshape-module" tabindex="0" role="button" data-key="temporal_reshape_out"><rect x="350" y="573" width="244" height="70" rx="11"></rect><text x="472" y="602">Rearrange back</text><text class="shape" x="472" y="625">[B·S,T,C] → [B,T,S,C]</text></g>
+          <g class="diagram-module gate-module" tabindex="0" role="button" data-key="temporal_gate_msa"><rect x="360" y="474" width="224" height="52" rx="26"></rect><text x="472" y="506">× gate_msa(timestep)</text></g>
+          <g class="add-node"><circle cx="472" cy="430" r="28"></circle><text x="472" y="439">＋</text></g>
+          <path class="residual-path" d="M350 1179 H674 V430 H503"></path>
+          <g class="diagram-module norm-module" tabindex="0" role="button" data-key="temporal_norm2"><rect x="340" y="360" width="264" height="70" rx="11"></rect><text x="472" y="390">LayerNorm 2</text><text class="shape" x="472" y="412">Pre-Norm</text></g>
+          <g class="diagram-module adaln-module temporal-adaln" tabindex="0" role="button" data-key="temporal_adaln2"><rect x="315" y="246" width="314" height="70" rx="11"></rect><text x="472" y="275">Timestep-AdaLN 2</text><text class="shape" x="472" y="298">shift_mlp / scale_mlp</text></g>
+          <g class="diagram-module mlp-module" tabindex="0" role="button" data-key="temporal_mlp"><rect x="340" y="132" width="264" height="70" rx="11"></rect><text x="472" y="161">MLP</text><text class="shape" x="472" y="184">1152 → 4608 → 1152</text></g>
+          <g class="diagram-module gate-module" tabindex="0" role="button" data-key="temporal_gate_mlp"><rect x="360" y="62" width="224" height="52" rx="26"></rect><text x="472" y="94">× gate_mlp(timestep)</text></g>
+          <g class="add-node output-add"><circle cx="472" cy="18" r="28"></circle><text x="472" y="27">＋</text></g>
+          <path class="residual-path top-residual temporal-residual" d="M674 430 H730 V18 H503"></path>
+
+          <g class="condition-source temporal-source" tabindex="0" role="button" data-key="temporal_condition"><rect x="22" y="1020" width="190" height="112" rx="13"></rect><text x="117" y="1049">全局 timestep 条件</text><text class="shape" x="117" y="1073">t_t=t_block(Eₜ(t))</text><text class="shape" x="117" y="1097">＋ layer table Rℓ</text><text class="shape" x="117" y="1117">[B,1,6,C]</text></g>
+          <path class="condition-bus temporal-bus" d="M117 1020 V88"></path>
+          <path class="condition-path" d="M117 948 H315"></path><path class="condition-path" d="M117 500 H360"></path><path class="condition-path" d="M117 280 H315"></path><path class="condition-path" d="M117 88 H360"></path>
+          <text class="condition-label" x="82" y="730" transform="rotate(-90 82 730)">只有 timestep 直接调制 Temporal</text>
+          <text class="output-label" x="472" y="8">输出 → 下一组 Spatial Block</text>
+        </svg>
+      </article>
+
+      <article class="diagram-view" data-view-panel="native" hidden>
+        <svg class="block-svg native-svg" viewBox="0 0 760 1220" role="img" aria-labelledby="native-title native-desc">
+          <title id="native-title">Open-Sora 原生 Spatial Transformer Block 精细结构</title>
+          <desc id="native-desc">原生 Spatial Block 使用 timestep 和 fps 产生 AdaLN 参数，并在 Attention residual 后执行文本 Cross-Attention，然后进入第二个 AdaLN 和 MLP。</desc>
+          <defs><marker id="native-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"></path></marker></defs>
+          <rect class="block-boundary native-boundary" x="245" y="75" width="455" height="1080" rx="22"></rect>
+          <text class="block-label" x="268" y="108">Open-Sora Spatial Block ℓ　× 28</text>
+          <path class="main-path native-main" d="M472 1155 V1098 M472 1028 V984 M472 914 V870 M472 800 V756 M472 686 V643 M472 573 V526 M472 474 V430 M472 360 V316 M472 246 V202 M472 132 V82"></path>
+          <g class="diagram-module input-module" tabindex="0" role="button" data-key="native_input"><rect x="350" y="1150" width="244" height="58" rx="11"></rect><text x="472" y="1175">输入 x</text><text class="shape" x="472" y="1195">[B,T·S,C]</text></g>
+          <g class="diagram-module norm-module" tabindex="0" role="button" data-key="native_norm1"><rect x="340" y="1028" width="264" height="70" rx="11"></rect><text x="472" y="1058">LayerNorm 1</text><text class="shape" x="472" y="1080">affine=False</text></g>
+          <g class="diagram-module adaln-module native-adaln" tabindex="0" role="button" data-key="native_adaln1"><rect x="315" y="914" width="314" height="70" rx="11"></rect><text x="472" y="943">AdaLN 1</text><text class="shape" x="472" y="966">condition = timestep + fps</text></g>
+          <g class="diagram-module attention-module" tabindex="0" role="button" data-key="native_attention"><rect x="315" y="800" width="314" height="70" rx="11"></rect><text x="472" y="829">Spatial Multi-Head Self-Attention</text><text class="shape" x="472" y="852">帧内 patch attention</text></g>
+          <g class="diagram-module gate-module" tabindex="0" role="button" data-key="native_gate_msa"><rect x="360" y="730" width="224" height="52" rx="26"></rect><text x="472" y="762">× gate_msa</text></g>
+          <g class="add-node"><circle cx="472" cy="686" r="28"></circle><text x="472" y="695">＋</text></g>
+          <path class="residual-path" d="M350 1179 H674 V686 H503"></path>
+          <g class="diagram-module cross-module" tabindex="0" role="button" data-key="native_cross"><rect x="315" y="573" width="314" height="70" rx="11"></rect><text x="472" y="602">Text Cross-Attention</text><text class="shape" x="472" y="625">Q=x · KV=caption tokens</text></g>
+          <g class="add-node cross-add"><circle cx="472" cy="526" r="28"></circle><text x="472" y="535">＋</text></g>
+          <path class="text-condition-path" d="M90 608 H315"></path><text class="text-condition-label" x="92" y="594">CaptionEmbedder(y)</text>
+          <g class="diagram-module norm-module" tabindex="0" role="button" data-key="native_norm2"><rect x="340" y="430" width="264" height="70" rx="11"></rect><text x="472" y="460">LayerNorm 2</text><text class="shape" x="472" y="482">Pre-Norm</text></g>
+          <g class="diagram-module adaln-module native-adaln" tabindex="0" role="button" data-key="native_adaln2"><rect x="315" y="316" width="314" height="70" rx="11"></rect><text x="472" y="345">AdaLN 2</text><text class="shape" x="472" y="368">shift_mlp / scale_mlp</text></g>
+          <g class="diagram-module mlp-module" tabindex="0" role="button" data-key="native_mlp"><rect x="340" y="202" width="264" height="70" rx="11"></rect><text x="472" y="231">MLP</text><text class="shape" x="472" y="254">1152 → 4608 → 1152</text></g>
+          <g class="diagram-module gate-module" tabindex="0" role="button" data-key="native_gate_mlp"><rect x="360" y="132" width="224" height="52" rx="26"></rect><text x="472" y="164">× gate_mlp</text></g>
+          <g class="add-node output-add"><circle cx="472" cy="82" r="28"></circle><text x="472" y="91">＋</text></g>
+          <path class="residual-path top-residual native-residual" d="M674 526 H730 V82 H503"></path>
+          <g class="condition-source native-source" tabindex="0" role="button" data-key="native_condition"><rect x="22" y="1015" width="190" height="112" rx="13"></rect><text x="117" y="1044">全局生成条件</text><text class="shape" x="117" y="1068">TimestepEmbedder</text><text class="shape" x="117" y="1091">＋ FPS Embed</text><text class="shape" x="117" y="1114">→ t_block → 6C</text></g>
+          <path class="condition-bus native-bus" d="M117 1015 V158"></path><path class="condition-path" d="M117 948 H315"></path><path class="condition-path" d="M117 756 H360"></path><path class="condition-path" d="M117 350 H315"></path><path class="condition-path" d="M117 158 H360"></path>
+          <text class="output-label" x="472" y="45">输出 → Temporal Block</text>
+        </svg>
+      </article>
+
+      <div class="pair-strip" aria-label="Spatial 与 Temporal 串联关系">
+        <div><small>每组主干</small><strong>Spatial Block(x, action+timestep)</strong></div><i>→</i>
+        <div><small>输出 hidden x₂</small><strong>Temporal Block(x₂, timestep)</strong></div><i>→</i>
+        <div class="repeat"><strong>重复 ×28</strong><small>中间没有独立 Action Layer</small></div>
+      </div>
+    </section>
+
+    <aside class="module-inspector" aria-live="polite">
+      <p id="module-kind">SPATIAL BLOCK</p>
+      <h2 id="module-title">Action-AdaLN 1</h2>
+      <p id="module-description">Action 生成的 shift_msa 与 scale_msa 直接调制 LayerNorm 之后的 video hidden。</p>
+      <dl>
+        <div><dt>输入 / 输出形状</dt><dd id="module-shape">[B,T,S,1152] → [B,T,S,1152]</dd></div>
+        <div><dt>关键公式</dt><dd><code id="module-formula">h=(1+scale_msa)·LN₁(x)+shift_msa</code></dd></div>
+      </dl>
+      <div class="legend">
+        <span><i class="norm"></i>Norm</span><span><i class="adaln"></i>AdaLN</span><span><i class="attention"></i>Attention</span><span><i class="mlp"></i>MLP</span><span><i class="gate"></i>Gate</span>
+      </div>
+      <div class="inspector-note">
+        <strong>读图方向</strong>
+        <span>从底部输入沿黑色主路径向上；右侧长线是 residual skip；左侧虚线是 condition 参数注入。</span>
+      </div>
+      <div class="source-box">
+        <strong>源码</strong>
+        <code id="module-source">WMPO/.../stdit3.py · L141–205</code>
+      </div>
+    </aside>
+  </main>
+
+  <script src="assets/block-detail.js"></script>
+</body>
+</html>
