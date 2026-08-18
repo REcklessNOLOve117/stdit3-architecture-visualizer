@@ -4,7 +4,12 @@
   const viewport = document.getElementById("architecture-viewport");
   const canvas = document.getElementById("architecture-canvas");
   const zoomValue = document.getElementById("zoom-value");
-  const state = { scale: .5, x: 0, y: 0, drag: false, pointer: null, startX: 0, startY: 0, originX: 0, originY: 0 };
+  const state = { scale: .5, x: 0, y: 0, drag: false, pointer: null, startX: 0, startY: 0, originX: 0, originY: 0, density: "learn" };
+  const semanticLevelEl=document.getElementById("semantic-level");
+  const densityButtons=[...document.querySelectorAll(".density-button")];
+  const clearPathButton=document.getElementById("clear-path");
+  const dimensionTrace=document.getElementById("dimension-trace");
+  const dimensionMessage=document.getElementById("dimension-message");
 
   const details = {
     rgb:["OUTSIDE STDiT3","RGB 视频","数据层面的原始输入。VAE 编码和加噪发生在 STDiT3.forward 之前。","[B,3,12,H₀,W₀]","模型外部：dataset / VAE"],
@@ -20,6 +25,11 @@
     actionEncoder:["ACTION CONDITION","ActionEncoder","每个 7D action 独立经过 Linear、SiLU、Linear 投影到 hidden size。这里的 SiLU 属于 action 编码器；编码结果不直接加到 video token。","Linear(7,4608) → SiLU → Linear(4608,1152)","WMPO stdit3.py · L37–72"],
     none:["ACTION ALIGNMENT","prepend NONE ×4","在 8 个未来 action embedding 前补 4 个可学习 NONE，使条件与 12 帧位置一一对齐。","[B,8,1152] → [B,12,1152]","WMPO stdit3.py · L54–65"],
     spatialCondition:["SPATIAL PARAMS","逐帧 Action + timestep 参数","每帧条件 cₛ=Eₜ(t)+Eₐ(aᵢ) 先过 SiLU，再由 Linear(1152,6912) 生成六组参数。绿色虚线只表示 shift / scale / gate 的路由，不是 Spatial 输出或 x₂ 广播。","cₛ → SiLU → Linear(1152,6·1152) → chunk(6)","WMPO stdit3.py · L295–298、L448–457"],
+    spatialAdaLN1:["ACTION ADALN","Attention 前的 Action-AdaLN","shift_msa 与 scale_msa 逐通道调制 LN₁(x)，因此 action 在 Q/K/V 生成之前改变 video hidden。","[B,T,S,C]；参数 [B,T,1,C] 沿 S 广播","WMPO stdit3.py · L147–167"],
+    spatialAdaLN2:["ACTION ADALN","MLP 前的 Action-AdaLN","shift_mlp 与 scale_mlp 调制 LN₂(x₁)，这是 action 在 Spatial Block 内的第二个直接注入点。","[B,T,S,C]；参数 [B,T,1,C] 沿 S 广播","WMPO stdit3.py · L186–204"],
+    gateMsa:["ACTION GATE","gate_msa：Attention 更新写回","gate_msa 不进入 Attention；它在 Attention 输出之后逐通道控制更新量写回 residual x 的强度。","x₁=x+gate_msa⊙Attention(AdaLN₁(x))","WMPO stdit3.py · L156–181"],
+    gateMlp:["ACTION GATE","gate_mlp：MLP 更新写回","gate_mlp 控制 MLP 更新量写回 x₁，最终产生已经包含 action 影响的 Spatial 输出 x₂。","x₂=x₁+gate_mlp⊙MLP(AdaLN₂(x₁))","WMPO stdit3.py · L186–205"],
+    crossOff:["GHOST BRANCH","Text Cross-Attention：不执行","当前 WMPO world-model forward 中该调用被注释，因此它只作为源码差异旁路显示，不属于 x₁→LayerNorm 2 的主计算流。","x₁ 直接进入 LayerNorm 2","WMPO stdit3.py · L181–186"],
     timestep:["DIFFUSION CONDITION","timestep","标量 diffusion / flow 时间决定当前噪声强度。","[B]","WMPO stdit3.py · L448–462"],
     tEmbed:["DIFFUSION CONDITION","TimestepEmbedder","先构造 256 维 sin/cos frequency embedding，再经过 Linear、SiLU、Linear 得到 1152 维全局条件。","[B] → sin/cos₍₂₅₆₎ → Linear → SiLU → Linear → [B,1152]","layers/blocks.py · L792–825"],
     temporalCondition:["TEMPORAL PARAMS","Temporal t_block","全局 Eₜ(t) 经过同一个 t_block：SiLU + Linear(1152,6912)，再切成六组 Temporal AdaLN/gate 参数；这里不再加入 action embedding。","Eₜ(t) → SiLU → Linear(1152,6·1152) → chunk(6)","WMPO stdit3.py · L295–298、L456–488"],
@@ -34,6 +44,13 @@
   const inspector = { kind:document.getElementById("detail-kind"), title:document.getElementById("detail-title"), description:document.getElementById("detail-description"), shape:document.getElementById("detail-shape"), source:document.getElementById("detail-source") };
   const inspectorPanel=document.getElementById("canvas-inspector");
   const inspectorReopen=document.getElementById("open-inspector");
+  const tensorTrace=document.getElementById("tensor-trace");
+  const tensorFields={name:document.getElementById("tensor-name"),produced:document.getElementById("tensor-produced"),consumed:document.getElementById("tensor-consumed"),action:document.getElementById("tensor-action")};
+  const tensorDetails={
+    spatialX2:{name:"x₂ · [B,T,S,1152]",produced:"Spatial MLP residual",consumed:"Temporal Block ℓ",action:"包含：YES · 直接 condition：NO"},
+    temporalHandoff:{name:"x₂ · shape 不变",produced:"Spatial Block return",consumed:"Temporal Block input",action:"数值携带 action；参数不广播"},
+    temporalX2:{name:"x₂ · [B,T,S,1152]",produced:"Spatial Block ℓ",consumed:"Temporal LN₁",action:"包含：YES · Temporal 不直接读 action"}
+  };
 
   const connectorGroup = document.getElementById("dynamic-connectors");
   const NS = "http://www.w3.org/2000/svg";
@@ -50,16 +67,10 @@
     {from:"#pair-28",to:"#node-final",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#node-final",to:"#node-unpatchify",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#node-unpatchify",to:"#node-decoder",kind:"main",fromSide:"bottom",toSide:"top"},
-    {from:"#sp-add2",to:"#spatial-output-x2",kind:"handoff",fromSide:"bottom",toSide:"top"},
     {from:"#spatial-output-x2",to:"#spatial-temporal-handoff",kind:"handoff",fromSide:"right",toSide:"left"},
     {from:"#spatial-temporal-handoff",to:"#temporal-input-x2",kind:"handoff",fromSide:"right",toSide:"left",route:"handoffRail",railGap:18},
-    {from:"#temporal-input-x2",to:"#tm-norm1",kind:"handoff",fromSide:"bottom",toSide:"top"},
 
     {from:"#node-pairs",to:"#block-title",kind:"zoom",fromSide:"right",toSide:"left",label:"展开 Pair ℓ"},
-    {from:"#sp-attn",to:"#attn-expanded-input",kind:"zoom",fromSide:"right",toSide:"left",label:"展开 Spatial Q/K/V"},
-    {from:"#tm-attn",to:"#attn-expanded-input",kind:"zoom",fromSide:"right",toSide:"left",label:"Temporal 使用同一 Attention 类"},
-    {from:"#sp-mlp",to:"#mlp-expanded-input",kind:"zoom",fromSide:"right",toSide:"left",label:"展开 Spatial MLP"},
-    {from:"#tm-mlp",to:"#mlp-expanded-input",kind:"zoom",fromSide:"right",toSide:"left",label:"Temporal 复用 MLP 结构"},
     {from:"#pair-28",to:"#final-expanded-input",kind:"zoom",fromSide:"right",toSide:"left",label:"Pair 28 输出"},
 
     {from:"#cond-spatial-params",to:"#sp-adaln1",kind:"action",fromSide:"right",toSide:"left",route:"bus",busX:850},
@@ -95,8 +106,9 @@
       const a=anchor(cfg.from,cfg.fromSide||"right"),b=anchor(cfg.to,cfg.toSide||"left");if(!a||!b)return;
       const kindClass=cfg.kind==="main"?"main-wire":cfg.kind==="zoom"?"zoom-wire":cfg.kind==="action"?"action-wire":cfg.kind==="handoff"?"handoff-wire":"time-wire";
       const path=svgElement("path",{d:pathFor(a,b,cfg),class:kindClass,"data-from":cfg.from,"data-to":cfg.to});
-      const start=svgElement("circle",{cx:a.x,cy:a.y,r:5,class:`connector-port ${cfg.kind} start-port`});
-      const end=svgElement("circle",{cx:b.x,cy:b.y,r:6,class:`connector-port ${cfg.kind} end-port`});
+      const startRadius=cfg.kind==="handoff"?3:5,endRadius=cfg.kind==="handoff"?4:6;
+      const start=svgElement("circle",{cx:a.x,cy:a.y,r:startRadius,class:`connector-port ${cfg.kind} start-port`});
+      const end=svgElement("circle",{cx:b.x,cy:b.y,r:endRadius,class:`connector-port ${cfg.kind} end-port`});
       connectorGroup.append(start,end,path);
       if(cfg.label){
         connectorGroup.append(path);
@@ -107,11 +119,13 @@
     });
   }
 
-  function render(){ canvas.style.transform=`translate(${state.x}px,${state.y}px) scale(${state.scale})`; zoomValue.textContent=Math.round(state.scale*100)+"%"; }
+  function render(){ canvas.style.transform=`translate(${state.x}px,${state.y}px) scale(${state.scale})`; zoomValue.textContent=Math.round(state.scale*100)+"%"; applySemanticZoom(); }
+  function applySemanticZoom(){const level=state.scale<.45?"overview":state.scale<.75?"structure":"detail";canvas.classList.remove("semantic-overview","semantic-structure","semantic-detail");canvas.classList.add("semantic-"+level);semanticLevelEl.textContent={overview:"总览层级",structure:"结构层级",detail:"计算层级"}[level];}
+  function setDensity(density){state.density=density;canvas.classList.remove("density-learn","density-structure","density-source");canvas.classList.add("density-"+density);densityButtons.forEach(button=>{const active=button.dataset.density===density;button.classList.toggle("is-active",active);button.setAttribute("aria-pressed",String(active));});}
   function clamp(){ const w=viewport.clientWidth,h=viewport.clientHeight,m=70,sw=CW*state.scale,sh=CH*state.scale; state.x=sw<w?(w-sw)/2:Math.min(m,Math.max(w-sw-m,state.x)); state.y=sh<h?(h-sh)/2:Math.min(m,Math.max(h-sh-m,state.y)); }
   function fit(){ const sx=(viewport.clientWidth-30)/CW,sy=(viewport.clientHeight-30)/CH; state.scale=Math.max(.1,Math.min(.9,Math.min(sx,sy))); state.x=(viewport.clientWidth-CW*state.scale)/2; state.y=(viewport.clientHeight-CH*state.scale)/2; render(); }
   function zoom(next,cx=viewport.clientWidth/2,cy=viewport.clientHeight/2){ const old=state.scale; next=Math.max(.1,Math.min(1.35,next)); const px=(cx-state.x)/old,py=(cy-state.y)/old; state.scale=next; state.x=cx-px*next;state.y=cy-py*next;clamp();render(); }
-  const regions={input:{x:20,y:100,w:820,h:900},condition:{x:20,y:950,w:820,h:750},block:{x:820,y:110,w:790,h:1270},handoff:{x:840,y:230,w:710,h:810},attention:{x:1570,y:110,w:720,h:1250},output:{x:830,y:1340,w:1460,h:340}};
+  const regions={input:{x:20,y:100,w:820,h:900},condition:{x:20,y:950,w:820,h:750},block:{x:820,y:110,w:790,h:1270},handoff:{x:820,y:110,w:790,h:1270},attention:{x:1570,y:110,w:720,h:1250},output:{x:830,y:1340,w:1460,h:340}};
   function setFocusMode(name){
     canvas.classList.toggle("is-handoff-focus",name==="handoff");
     canvas.classList.toggle("is-routing-focus",name==="condition");
@@ -121,15 +135,33 @@
       button.setAttribute("aria-pressed",String(active));
     });
   }
-  function focus(name){ const r=regions[name]; if(!r)return; setFocusMode(name); const s=Math.min((viewport.clientWidth-80)/r.w,(viewport.clientHeight-80)/r.h,.95); state.scale=Math.max(.3,s); state.x=viewport.clientWidth/2-(r.x+r.w/2)*state.scale; state.y=viewport.clientHeight/2-(r.y+r.h/2)*state.scale; clamp();render(); }
+  function focus(name){ const r=regions[name]; if(!r)return; setFocusMode(name); const s=Math.min((viewport.clientWidth-80)/r.w,(viewport.clientHeight-80)/r.h,.95); const minimum=name==="handoff"?.48:["condition","block","attention"].includes(name)?.76:.48; state.scale=Math.max(minimum,s); state.x=viewport.clientWidth/2-(r.x+r.w/2)*state.scale; state.y=viewport.clientHeight/2-(r.y+r.h/2)*state.scale; clamp();render(); }
   function setInspectorOpen(open){inspectorPanel.classList.toggle("is-collapsed",!open);inspectorReopen.classList.toggle("is-visible",!open);}
-  function showDetail(key){ const d=details[key]; if(!d)return; document.querySelectorAll(".detail-node").forEach(n=>n.classList.toggle("is-selected",n.dataset.detail===key)); inspector.kind.textContent=d[0];inspector.title.textContent=d[1];inspector.description.textContent=d[2];inspector.shape.textContent=d[3];inspector.source.textContent=d[4];setInspectorOpen(true); }
-  document.querySelectorAll(".detail-node").forEach(n=>n.addEventListener("click",()=>showDetail(n.dataset.detail)));
+  const pathGroups={
+    spatialAdaLN1:["cond-actions","cond-action-encoder","cond-none","cond-spatial-params","sp-norm1","sp-adaln1","sp-attn"],
+    gateMsa:["cond-actions","cond-action-encoder","cond-none","cond-spatial-params","sp-gate1","sp-add1"],
+    spatialAdaLN2:["cond-actions","cond-action-encoder","cond-none","cond-spatial-params","sp-norm2","sp-adaln2","sp-mlp"],
+    gateMlp:["cond-actions","cond-action-encoder","cond-none","cond-spatial-params","sp-gate2","sp-add2","spatial-output-x2"],
+    spatialX2:["sp-mlp","sp-gate2","sp-add2","spatial-output-x2","spatial-temporal-handoff","temporal-input-x2"],
+    temporalHandoff:["spatial-output-x2","spatial-temporal-handoff","temporal-input-x2"],
+    temporalX2:["spatial-output-x2","spatial-temporal-handoff","temporal-input-x2","tm-norm1"],
+    spatialAttn:["sp-adaln1","sp-attn","attn-expanded-input"],
+    temporalAttn:["temporal-input-x2","tm-norm1","tm-adaln1","tm-attn-reshape","tm-attn","tm-attn-restore"]
+  };
+  function showDetail(key,origin){ const d=details[key]; if(!d)return; document.querySelectorAll(".detail-node").forEach(n=>n.classList.toggle("is-selected",n===origin)); inspector.kind.textContent=d[0];inspector.title.textContent=d[1];inspector.description.textContent=d[2];inspector.shape.textContent=d[3];inspector.source.textContent=d[4];showTensorTrace(key);highlightPath(key,origin);updateDimensionTrace(key);setInspectorOpen(true); }
+  function showTensorTrace(key){const item=tensorDetails[key];tensorTrace.hidden=!item;if(!item)return;tensorFields.name.textContent=item.name;tensorFields.produced.textContent=item.produced;tensorFields.consumed.textContent=item.consumed;tensorFields.action.textContent=item.action;}
+  function highlightPath(key,origin){clearPath(false);const ids=new Set(pathGroups[key]||[origin?.id].filter(Boolean));if(!ids.size)return;canvas.classList.add("is-path-focus");ids.forEach(id=>document.getElementById(id)?.classList.add("path-active"));document.querySelectorAll("#dynamic-connectors path").forEach(path=>{const from=(path.dataset.from||"").replace("#","");const to=(path.dataset.to||"").replace("#","");path.classList.toggle("path-active",ids.has(from)&&ids.has(to));});clearPathButton.hidden=false;requestAnimationFrame(()=>framePath(ids));}
+  function framePath(ids){const elements=[...ids].map(id=>document.getElementById(id)).filter(Boolean);if(elements.length<2)return;const cr=canvas.getBoundingClientRect(),s=state.scale||1;const boxes=elements.map(el=>{const r=el.getBoundingClientRect();return{l:(r.left-cr.left)/s,t:(r.top-cr.top)/s,r:(r.right-cr.left)/s,b:(r.bottom-cr.top)/s};});const left=Math.min(...boxes.map(b=>b.l)),top=Math.min(...boxes.map(b=>b.t)),right=Math.max(...boxes.map(b=>b.r)),bottom=Math.max(...boxes.map(b=>b.b)),pad=110;const next=Math.min(.92,(viewport.clientWidth-100)/(right-left+pad*2),(viewport.clientHeight-100)/(bottom-top+pad*2));state.scale=Math.max(.48,next);state.x=viewport.clientWidth/2-(left+right)/2*state.scale;state.y=viewport.clientHeight/2-(top+bottom)/2*state.scale;clamp();render();}
+  function clearPath(hideButton=true){canvas.classList.remove("is-path-focus");document.querySelectorAll(".path-active").forEach(el=>el.classList.remove("path-active"));if(hideButton)clearPathButton.hidden=true;}
+  function updateDimensionTrace(key){const temporal=/temporal/i.test(key);const spatial=/spatial|gateMsa|gateMlp|mlp/i.test(key)&&!temporal;dimensionTrace.classList.toggle("spatial",spatial);dimensionTrace.classList.toggle("temporal",temporal);dimensionMessage.textContent=temporal?"Temporal：B×S → B·S，Attention axis=T。":spatial?"Spatial：B×T → B·T，Attention axis=S。":"视频身份保持 [B,T,S,C]。";}
+  document.querySelectorAll(".detail-node").forEach(n=>n.addEventListener("click",()=>showDetail(n.dataset.detail,n)));
+  densityButtons.forEach(button=>button.addEventListener("click",()=>setDensity(button.dataset.density)));
+  clearPathButton.addEventListener("click",()=>clearPath(true));
   document.getElementById("close-inspector").addEventListener("click",()=>setInspectorOpen(false));
   inspectorReopen.addEventListener("click",()=>setInspectorOpen(true));
   document.getElementById("zoom-in").addEventListener("click",()=>zoom(state.scale+.1));
   document.getElementById("zoom-out").addEventListener("click",()=>zoom(state.scale-.1));
-  document.getElementById("fit-canvas").addEventListener("click",()=>{setFocusMode(null);fit();});
+  document.getElementById("fit-canvas").addEventListener("click",()=>{setFocusMode(null);clearPath(true);fit();});
   document.getElementById("actual-size").addEventListener("click",()=>zoom(1));
   document.querySelectorAll("[data-focus]").forEach(b=>b.addEventListener("click",()=>focus(b.dataset.focus)));
   viewport.addEventListener("pointerdown",e=>{if(e.target.closest("button,a,.canvas-inspector"))return;state.drag=true;state.pointer=e.pointerId;state.startX=e.clientX;state.startY=e.clientY;state.originX=state.x;state.originY=state.y;viewport.classList.add("is-dragging");viewport.setPointerCapture(e.pointerId)});
@@ -143,6 +175,6 @@
   const modes={spatial:{input:"[B·T,S,1152]",q:"[B·T,16,S,72]",k:"[B·T,16,S,72]",v:"[B·T,16,S,72]",score:"[B·T,16,S,S]",weighted:"[B·T,16,S,72]",output:"[B·T,S,1152]",rope:"Spatial：无 RoPE",mask:"OFF",causal:false},temporal:{input:"[B·S,T,1152]",q:"[B·S,16,T,72]",k:"[B·S,16,T,72]",v:"[B·S,16,T,72]",score:"[B·S,16,T,T]",weighted:"[B·S,16,T,72]",output:"[B·S,T,1152]",rope:"Temporal：Q/K 使用 RoPE",mask:"下三角 ON",causal:true}};
   function setMode(key){const m=modes[key];document.getElementById("attn-input").textContent=m.input;document.getElementById("q-shape").textContent=m.q;document.getElementById("k-shape").textContent=m.k;document.getElementById("v-shape").textContent=m.v;document.getElementById("score-shape").textContent=m.score;document.getElementById("weighted-shape").textContent=m.weighted;document.getElementById("attn-output").textContent=m.output;document.getElementById("rope-state").textContent=m.rope;document.querySelector("#causal-mask code").textContent=m.mask;document.getElementById("causal-mask").classList.toggle("is-off",!m.causal);document.querySelectorAll("[data-attention]").forEach(b=>{const on=b.dataset.attention===key;b.classList.toggle("is-active",on);b.setAttribute("aria-pressed",String(on))})}
   document.querySelectorAll("[data-attention]").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.attention)));
-  setFocusMode(null);showDetail("latent");setInspectorOpen(false);setMode("spatial");requestAnimationFrame(()=>{fit();drawConnections();});
+  setFocusMode(null);setDensity("learn");showDetail("latent");setInspectorOpen(false);setMode("spatial");requestAnimationFrame(()=>{fit();drawConnections();});
   if(document.fonts?.ready)document.fonts.ready.then(drawConnections);
 })();

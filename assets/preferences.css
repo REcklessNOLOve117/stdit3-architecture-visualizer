@@ -1,0 +1,79 @@
+:root { --reader-scale: 1; }
+
+html[data-font-scale="90"] { font-size: 90%; }
+html[data-font-scale="115"] { font-size: 115%; }
+
+body.comfort-theme {
+  --bg: #11161c !important;
+  --panel: #171d24 !important;
+  --panel-2: #1b232c !important;
+  --panel2: #1b232c !important;
+  --panel-3: #202a34 !important;
+  --text: #e6edf3 !important;
+  --muted: #a3adb7 !important;
+  --line: #34404b !important;
+  --line-strong: #4a5966 !important;
+  background-color: #11161c !important;
+}
+
+body.grid-off,
+body.grid-off .diagram-viewport,
+body.grid-off .architecture-viewport,
+body.grid-off .architecture-canvas {
+  background-image: none !important;
+}
+
+body.motion-off *,
+body.motion-off *::before,
+body.motion-off *::after {
+  animation: none !important;
+  scroll-behavior: auto !important;
+  transition: none !important;
+}
+
+.display-settings {
+  position: fixed;
+  z-index: 1000;
+  right: 12px;
+  top: 12px;
+  color: var(--text, #e6edf3);
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+.display-settings summary {
+  width: max-content;
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid var(--line, #34404b);
+  border-radius: 8px;
+  background: var(--panel-2, #1b232c);
+  color: var(--text, #e6edf3);
+  cursor: pointer;
+  font-size: 12px;
+  list-style: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+}
+
+.display-settings summary::-webkit-details-marker { display: none; }
+
+.display-settings[open] summary { border-bottom-right-radius: 0; border-bottom-left-radius: 0; }
+
+.display-settings-panel {
+  display: grid;
+  width: 230px;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line, #34404b);
+  border-radius: 9px 0 9px 9px;
+  background: var(--panel, #171d24);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .35);
+}
+
+.display-settings-panel > strong { font-size: 12px; }
+.display-settings-panel label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted, #a3adb7); font-size: 11px; }
+.display-settings-panel select { min-width: 92px; padding: 4px 6px; border: 1px solid var(--line, #34404b); border-radius: 5px; background: var(--panel-2, #1b232c); color: var(--text, #e6edf3); }
+.display-settings-panel input { accent-color: var(--action, var(--green, #5ee0a5)); }
+
+@media (max-width: 720px) {
+  .display-settings { top: auto; bottom: 10px; }
+}

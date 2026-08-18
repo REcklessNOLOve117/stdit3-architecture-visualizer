@@ -220,6 +220,9 @@
   const moduleShape = document.getElementById("module-shape");
   const moduleFormula = document.getElementById("module-formula");
   const moduleSource = document.getElementById("module-source");
+  const flowButtons = [...document.querySelectorAll(".flow-button")];
+  const diagramStage = document.getElementById("diagram-stage");
+  const backwardOverlay = document.getElementById("backward-overlay");
 
   function showDetail(key) {
     const item = details[key];
@@ -253,6 +256,30 @@
 
   tabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
 
+  function setFlowMode(mode) {
+    const backward = mode === "backward";
+    diagramStage.classList.toggle("backward-mode", backward);
+    backwardOverlay.hidden = !backward;
+    flowButtons.forEach((button) => {
+      const active = button.dataset.flow === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    if (backward) {
+      moduleKind.textContent = "BACKWARD · GRADIENT";
+      moduleTitle.textContent = "Loss → gate / AdaLN → t_block → ActionEncoder";
+      moduleDescription.textContent = "Attention 与 MLP 两条梯度支路都回到六组调制参数，再经逐帧 condition 返回 ActionEncoder；Spatial Block 参数也同时获得梯度。";
+      moduleShape.textContent = "∂L/∂x₂ → ∂L/∂pᵢ → ∂L/∂θ_action";
+      moduleFormula.textContent = "∂L/∂cᵢ = (∂L/∂pᵢ) · (∂t_block/∂cᵢ)";
+      moduleSource.textContent = "PyTorch autograd · 对应 WMPO forward L141–205, L448–487";
+    } else {
+      const activeView = tabs.find((tab) => tab.classList.contains("is-active"))?.dataset.view || "spatial";
+      showDetail(viewMeta[activeView].defaultKey);
+    }
+  }
+
+  flowButtons.forEach((button) => button.addEventListener("click", () => setFlowMode(button.dataset.flow)));
+
   interactiveNodes.forEach((node) => {
     node.addEventListener("click", () => showDetail(node.dataset.key));
     node.addEventListener("keydown", (event) => {
@@ -274,4 +301,5 @@
   });
 
   switchView("spatial");
+  setFlowMode("forward");
 })();

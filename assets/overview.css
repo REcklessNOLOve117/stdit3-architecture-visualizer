@@ -188,7 +188,8 @@ h1 {
   border-radius: 10px;
 }
 
-.view-button {
+.view-button,
+.density-button {
   min-height: 38px;
   padding: 7px 13px;
   border: 0;
@@ -198,11 +199,13 @@ h1 {
   cursor: pointer;
 }
 
-.view-button:last-child {
+.view-button:last-child,
+.density-button:last-child {
   border-right: 0;
 }
 
-.view-button.is-active {
+.view-button.is-active,
+.density-button.is-active {
   background: #66dce8;
   color: #041014;
   font-weight: 800;
@@ -332,6 +335,13 @@ h1 {
   font-size: 0.74rem;
 }
 
+.semantic-level {
+  padding: 5px 9px;
+  color: var(--condition);
+  font: 700 .68rem "Cascadia Code", monospace;
+}
+#clear-path[hidden] { display:none; }
+
 .zoom-controls button {
   cursor: pointer;
 }
@@ -412,6 +422,12 @@ h1 {
   stroke-dasharray: 7 5;
   marker-end: url(#arrow-condition);
 }
+
+/* 固定信号语法：feature 用粗实线；condition / 参数永远使用虚线。 */
+.connector-path.native,
+.connector-path.wmpo { stroke-width: 3.4; stroke-dasharray: none; }
+.connector-path.condition,
+.connector-path.action { stroke-dasharray: 8 6; }
 
 .connector-path.action {
   stroke: rgba(94, 224, 165, 0.78);
@@ -589,6 +605,46 @@ h1 {
   font-size: 11px;
   line-height: 1.25;
 }
+
+.diagram-canvas.density-learn .node-type,
+.diagram-canvas.density-learn .node-shape { display: none; }
+.diagram-canvas.density-structure .node-type { display: none; }
+
+.diagram-canvas.semantic-overview .arch-node[data-semantic="structure"],
+.diagram-canvas.semantic-overview .arch-node[data-semantic="detail"],
+.diagram-canvas.semantic-overview .connector-path[data-semantic="structure"],
+.diagram-canvas.semantic-overview .connector-path[data-semantic="detail"],
+.diagram-canvas.semantic-overview .connector-label,
+.diagram-canvas.semantic-overview .exploded-panel,
+.diagram-canvas.semantic-overview .backbone-bracket { opacity: 0; pointer-events: none; }
+.diagram-canvas.semantic-overview .arch-node[data-semantic="overview"] .node-name { font-size: 27px; }
+.diagram-canvas.semantic-overview .arch-node[data-semantic="overview"] .node-type,
+.diagram-canvas.semantic-overview .arch-node[data-semantic="overview"] .node-shape { display:none; }
+.diagram-canvas.semantic-overview .arch-node,
+.diagram-canvas.semantic-overview .connector-path,
+.diagram-canvas.semantic-overview .lane-title,
+.diagram-canvas.semantic-overview .branch-caption { opacity:0; pointer-events:none; }
+.semantic-summary-flow { position:absolute; left:120px; z-index:8; display:none; width:2460px; align-items:center; gap:34px; }
+.diagram-canvas.semantic-overview .semantic-summary-flow { display:flex; }
+.semantic-summary-flow>strong { width:210px; color:var(--shared); font-size:34px; }
+.semantic-summary-flow.wmpo>strong { color:var(--action); }
+.semantic-summary-flow span { display:grid; min-height:130px; flex:1; place-items:center; padding:18px; border:4px solid var(--shared); border-radius:18px; background:#102233; color:var(--text); font-size:30px; font-weight:800; text-align:center; }
+.semantic-summary-flow.wmpo span { border-color:var(--action); background:#102a25; }
+.semantic-summary-flow i { color:var(--muted); font-size:52px; font-style:normal; }
+
+.diagram-canvas.semantic-structure .arch-node[data-semantic="detail"],
+.diagram-canvas.semantic-structure .connector-path[data-semantic="detail"],
+.diagram-canvas.semantic-structure .exploded-panel,
+.diagram-canvas.semantic-structure .connector-label:not(.action-bus-label) { opacity: 0; pointer-events: none; }
+
+.diagram-canvas.is-path-focus .arch-node:not(.path-active),
+.diagram-canvas.is-path-focus .connector-path:not(.path-active),
+.diagram-canvas.is-path-focus .connector-label,
+.diagram-canvas.is-path-focus .lane-background,
+.diagram-canvas.is-path-focus .exploded-panel { opacity: .12; filter: grayscale(.65); }
+.diagram-canvas.is-path-focus .arch-node.path-active,
+.diagram-canvas.is-path-focus .connector-path.path-active { opacity: 1; filter: none; }
+.diagram-canvas.is-path-focus .connector-path.path-active { stroke-width: 5; }
 
 .diagram-canvas.hide-shapes .node-shape {
   display: none;
@@ -772,6 +828,9 @@ h1 {
   gap: 5px;
 }
 
+.key-line { display: inline-block; width: 28px; height: 0; border-top: 3px solid #9db3c2; }
+.key-line.control { border-top: 2px dashed var(--condition); }
+
 .key-dot {
   width: 7px;
   height: 7px;
@@ -792,6 +851,26 @@ h1 {
   padding: 8px;
   pointer-events: none;
 }
+
+.dimension-trace {
+  position: absolute;
+  z-index: 20;
+  right: 12px;
+  top: 12px;
+  width: 270px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(7, 15, 22, .92);
+  pointer-events: none;
+}
+.dimension-trace > strong { color: #66dce8; font-size: 10px; letter-spacing: .08em; }
+.dimension-trace > div { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 7px; }
+.dimension-trace span { display: grid; padding: 5px; background: var(--panel-2); color: var(--text); font: 800 12px "Cascadia Code", monospace; text-align: center; }
+.dimension-trace small { color: var(--muted); font: 400 8px Inter, sans-serif; }
+.dimension-trace p { margin: 7px 0 0; color: var(--muted); font-size: 9px; }
+.dimension-trace.spatial span:nth-child(1), .dimension-trace.spatial span:nth-child(2),
+.dimension-trace.temporal span:nth-child(1), .dimension-trace.temporal span:nth-child(3) { background: rgba(94,224,165,.16); color: var(--action); }
 
 .minimap-label {
   color: #637e91;
@@ -927,6 +1006,11 @@ h1 {
   font-size: 0.69rem;
 }
 
+body[data-density="learn"] .source-section,
+body[data-density="learn"] .inspector-section code,
+body[data-density="learn"] .inspector-facts { display: none; }
+body[data-density="structure"] .source-section { display: none; }
+
 .inspector-footer {
   display: flex;
   flex-wrap: wrap;
@@ -946,6 +1030,11 @@ h1 {
   font-size: 0.67rem;
   font-weight: 800;
 }
+
+.path-summary { display: grid; gap: 5px; margin-top: 16px; padding: 11px; border-left: 3px solid var(--action); background: rgba(94,224,165,.07); }
+.path-summary[hidden] { display:none; }
+.path-summary strong { color: var(--action); font-size: .7rem; }
+.path-summary span { color: #c7d6e0; font-size: .72rem; }
 
 .classification.action {
   background: rgba(94, 224, 165, 0.1);

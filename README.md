@@ -30,7 +30,9 @@
 - 在画布空白处拖拽，使用滚轮或顶部按钮缩放；按 `0` 可适合窗口。
 - 左侧章节可以聚焦输入、条件、Spatial/Temporal Block、28 对主干和输出。
 - 点击任意模块或任意一层 Block，右侧会显示张量形状、关键计算和源码位置。
-- “原生 / WMPO / 对比”用于突出或弱化对应模型；“显示张量形状”可降低画布信息密度。
+- “原生 / WMPO / 对比”用于突出或弱化对应模型；“学习 / 结构 / 源码”控制信息密度。
+- 缩放不仅改变尺寸，也会在“总览 / 结构 / 计算”三个语义层级之间自动切换。
+- 点击模块会高亮完整上下游路径；Dimension Trace 会指出 Spatial 的 `B·T / axis=S` 与 Temporal 的 `B·S / axis=T`。
 
 ### Action-AdaLN 数值手算
 
@@ -42,9 +44,11 @@
 
 - 从 `overview.html` 顶部的“Block 内部精细图”进入，或直接打开 `block-detail.html`。
 - 使用三个标签切换 WMPO Spatial Block、WMPO Temporal Block 和原生 Open-Sora Spatial Block。
-- 读图方向为从下到上；右侧长线是 residual skip，左侧虚线是 condition 参数注入。
+- 读图方向统一为真实 forward 的从上到下；右侧长线是 residual skip，左侧虚线是 condition 参数注入。
 - 点击任一彩色模块，可以查看该模块的张量形状、公式、作用和源码位置。
 - WMPO Spatial 图明确展示 Action-AdaLN 直接进入 Self-Attention 前和 MLP 前，不存在独立的 Action Layer。
+- WMPO 中关闭的 Text Cross-Attention 作为侧边 ghost branch 展示，不再占据主计算流。
+- `Forward / Backward` 可切换到从 Loss 返回 gate、AdaLN、t_block 与 ActionEncoder 的梯度主链。
 
 ### 输入到输出精细架构
 
@@ -53,6 +57,12 @@
 - 左侧主干从 RGB/VAE 外部上下文开始，明确标出 STDiT3 真正的输入是噪声 latent `x_t`；中间展开一个完整 Spatial/Temporal Pair；右侧展开 Attention Q/K/V 和 MLP；底部展开 Final Layer 与 unpatchify。
 - 在画布空白处拖拽，使用滚轮或顶部按钮缩放；聚焦按钮可快速定位输入、条件、单层 Block、Attention/MLP 和输出。
 - Attention 面板可在 Spatial 与 Temporal causal 两种形状之间切换。
+- 点击 `gate_msa`、`gate_mlp` 或 `x₂` 会聚焦对应完整路径；`x₂` Inspector 会显示 produced by、consumed by 和 action influence。
+
+### 阅读舒适度
+
+- 所有页面右上角提供“阅读设置”：Comfort Dark、90%/100%/115% 字号、网格开关与动画开关。
+- 设置保存在浏览器本地；页面仍可完全离线运行。
 
 ## 源码依据
 

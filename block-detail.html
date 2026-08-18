@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>STDiT3 Block 内部精细架构</title>
   <link rel="stylesheet" href="assets/block-detail.css">
+  <link rel="stylesheet" href="assets/preferences.css">
 </head>
 <body>
   <a class="skip-link" href="#diagram-stage">跳到 Block 架构图</a>
@@ -16,7 +17,7 @@
       <div>
         <p class="eyebrow">MODULE-LEVEL SCHEMATIC</p>
         <h1>STDiT3 Block 内部精细架构</h1>
-        <p>按 Norm、AdaLN、Attention、gate、residual、MLP 的粒度展开；箭头方向从下到上。</p>
+        <p>按真实 forward 顺序从上到下展开 Norm、AdaLN、Attention、gate、residual 与 MLP。</p>
       </div>
     </div>
     <div class="header-actions">
@@ -44,13 +45,26 @@
           <span id="view-kind">WMPO SPATIAL</span>
           <strong id="view-title">Action-conditioned Spatial Transformer Block</strong>
         </div>
-        <p>点击彩色模块查看公式与张量形状</p>
+        <div class="flow-mode" role="group" aria-label="计算方向"><button type="button" class="flow-button is-active" data-flow="forward" aria-pressed="true">Forward</button><button type="button" class="flow-button" data-flow="backward" aria-pressed="false">Backward</button></div>
       </div>
+
+      <section id="backward-overlay" class="backward-overlay" hidden aria-label="Action-AdaLN 反向传播路径">
+        <header><small>COMPUTATION GRAPH</small><h2>梯度如何返回 ActionEncoder</h2><p>先追踪 gate 与 AdaLN 主链，不展开完整 Q/K/V Jacobian。</p></header>
+        <div class="gradient-flow">
+          <div><b>Loss L</b><code>∂L/∂x₂</code></div><i>↑</i>
+          <div><b>Residual x₂</b><code>x₁ + gate_mlp ⊙ MLP(h)</code></div><i>↑</i>
+          <div><b>gate_mlp</b><code>∂L/∂gate_mlp</code></div><i>↑</i>
+          <div><b>AdaLN₂</b><code>∂L/∂shift · ∂L/∂scale</code></div><i>↑</i>
+          <div><b>t_block</b><code>∂L/∂pᵢ</code></div><i>↑</i>
+          <div><b>ActionEncoder</b><code>∂L/∂θ_action</code></div>
+        </div>
+        <div class="gradient-branches"><span><b>Attention 支路</b> gate_msa → AdaLN₁ → t_block</span><span><b>MLP 支路</b> gate_mlp → AdaLN₂ → t_block</span><span><b>共享汇合</b> 两条梯度在逐帧 condition cᵢ 处相加</span></div>
+      </section>
 
       <article class="diagram-view is-active" data-view-panel="spatial">
         <svg class="block-svg" viewBox="0 -60 760 1280" role="img" aria-labelledby="spatial-title spatial-desc">
           <title id="spatial-title">WMPO Spatial Transformer Block 精细结构</title>
-          <desc id="spatial-desc">从底部输入 x 开始，依次经过 LayerNorm、Action-AdaLN、Spatial Multi-Head Self-Attention、gate 和 residual，再经过第二个 LayerNorm、Action-AdaLN、MLP、gate 和 residual，输出 x2。</desc>
+          <desc id="spatial-desc">从顶部输入 x 开始，依次向下经过 LayerNorm、Action-AdaLN、Spatial Multi-Head Self-Attention、gate 和 residual，再经过第二个 LayerNorm、Action-AdaLN、MLP、gate 和 residual，输出 x2。</desc>
           <defs>
             <marker id="spatial-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"></path></marker>
             <marker id="spatial-cond-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z"></path></marker>
@@ -59,7 +73,7 @@
           <rect class="block-boundary spatial-boundary" x="245" y="75" width="455" height="1080" rx="22"></rect>
           <text class="block-label" x="268" y="108">Spatial Block ℓ　× 28</text>
 
-          <path class="main-path" d="M472 1155 V1098 M472 1028 V984 M472 914 V870 M472 800 V756 M472 686 V643 M472 573 V526 M472 474 V458 M472 402 V430 M472 360 V316 M472 246 V232 M472 162 V146 M472 82 V70 M472 18 V8"></path>
+          <path class="main-path" d="M472 1155 V1098 M472 1028 V984 M472 914 V870 M472 800 V756 M472 686 V643 M472 573 V526 M472 474 V458 M472 402 V316 M472 246 V232 M472 162 V146 M472 82 V70 M472 18 V8"></path>
 
           <g class="diagram-module input-module" tabindex="0" role="button" data-key="spatial_input">
             <rect x="350" y="1150" width="244" height="58" rx="11"></rect>
@@ -100,9 +114,10 @@
           <path class="residual-path" d="M350 1179 H674 V430 H503"></path>
           <text class="residual-label" x="630" y="777" transform="rotate(-90 630 777)">residual x</text>
 
-          <g class="diagram-module disabled-module" tabindex="0" role="button" data-key="spatial_cross_off">
-            <rect x="360" y="360" width="224" height="70" rx="11"></rect>
-            <text x="472" y="389">Text Cross-Attention</text><text class="shape" x="472" y="412">OFF · forward 中注释</text>
+          <path class="ghost-path" d="M503 430 H620 V410"></path><text class="ghost-x" x="617" y="423">×</text>
+          <g class="diagram-module disabled-module ghost-module" tabindex="0" role="button" data-key="spatial_cross_off">
+            <rect x="520" y="340" width="200" height="70" rx="11"></rect>
+            <text x="620" y="369">Text Cross-Attention</text><text class="shape" x="620" y="392">OFF · ghost branch</text>
           </g>
 
           <g class="diagram-module norm-module" tabindex="0" role="button" data-key="spatial_norm2">
@@ -236,7 +251,7 @@
       </div>
       <div class="inspector-note">
         <strong>读图方向</strong>
-        <span>从底部输入沿黑色主路径向上；右侧长线是 residual skip；左侧虚线是 condition 参数注入。</span>
+        <span>从顶部输入沿粗实线向下；右侧长线是 residual skip；左侧虚线是 condition 参数注入。</span>
       </div>
       <div class="source-box">
         <strong>源码</strong>
@@ -246,5 +261,6 @@
   </main>
 
   <script src="assets/block-detail.js"></script>
+  <script src="assets/preferences.js"></script>
 </body>
 </html>

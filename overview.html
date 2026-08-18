@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>STDiT3 完整架构总览</title>
   <link rel="stylesheet" href="assets/overview.css">
+  <link rel="stylesheet" href="assets/preferences.css">
 </head>
 <body>
   <a class="skip-link" href="#diagram-viewport">跳到架构画布</a>
@@ -31,10 +32,11 @@
         <button type="button" class="view-button" data-view="wmpo" aria-pressed="false">WMPO</button>
         <button type="button" class="view-button is-active" data-view="compare" aria-pressed="true">对比</button>
       </div>
-      <label class="shape-toggle">
-        <input id="shape-toggle" type="checkbox" checked>
-        <span>显示张量形状</span>
-      </label>
+      <div class="density-control segmented" role="group" aria-label="信息密度">
+        <button type="button" class="density-button is-active" data-density="learn" aria-pressed="true">学习</button>
+        <button type="button" class="density-button" data-density="structure" aria-pressed="false">结构</button>
+        <button type="button" class="density-button" data-density="source" aria-pressed="false">源码</button>
+      </div>
     </div>
   </header>
 
@@ -78,8 +80,10 @@
           <button type="button" id="zoom-in" aria-label="放大">＋</button>
           <button type="button" id="fit-view">适合窗口</button>
           <button type="button" id="reset-view">100%</button>
+          <span id="semantic-level" class="semantic-level">总览层级</span>
+          <button type="button" id="clear-path" hidden>清除路径</button>
         </div>
-        <p class="canvas-hint">拖动画布 · 滚轮缩放 · 点击模块查看细节</p>
+        <p class="canvas-hint">缩放会自动改变信息粒度 · 点击模块聚焦上下游路径</p>
       </div>
 
       <div id="diagram-viewport" class="diagram-viewport" tabindex="0" aria-label="可缩放 STDiT3 完整架构图">
@@ -89,11 +93,19 @@
         </div>
 
         <div class="canvas-key" aria-label="架构颜色图例">
+          <span><i class="key-line tensor"></i>Tensor / hidden</span>
+          <span><i class="key-line control"></i>Condition / 参数</span>
           <span><i class="key-dot shared"></i>共享模块</span>
           <span><i class="key-dot condition"></i>条件</span>
           <span><i class="key-dot action"></i>WMPO 核心改造</span>
           <span><i class="key-dot removed"></i>禁用</span>
           <span><i class="key-dot drift"></i>fork 差异</span>
+        </div>
+
+        <div id="dimension-trace" class="dimension-trace" aria-live="polite">
+          <strong>Dimension Trace</strong>
+          <div><span>B<small>batch</small></span><span>T<small>12 frames</small></span><span>S<small>spatial patches</small></span><span>C<small>1152 hidden</small></span></div>
+          <p id="dimension-message">选择 Spatial / Temporal 节点查看维度合并方向</p>
         </div>
 
         <div class="minimap" aria-hidden="true">
@@ -145,6 +157,10 @@
         <span id="inspector-class" class="classification">共享骨架</span>
         <span id="inspector-count"></span>
       </div>
+      <div id="path-summary" class="path-summary" hidden>
+        <strong>当前聚焦路径</strong>
+        <span id="path-summary-text"></span>
+      </div>
     </aside>
   </main>
 
@@ -155,5 +171,6 @@
   </section>
 
   <script src="assets/overview.js"></script>
+  <script src="assets/preferences.js"></script>
 </body>
 </html>

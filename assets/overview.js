@@ -13,7 +13,14 @@
   const zoomValue = document.getElementById("zoom-value");
   const minimapWindow = document.getElementById("minimap-window");
   const viewButtons = Array.from(document.querySelectorAll(".view-button"));
+  const densityButtons = Array.from(document.querySelectorAll(".density-button"));
   const chapterButtons = Array.from(document.querySelectorAll(".chapter-button"));
+  const semanticLevel = document.getElementById("semantic-level");
+  const dimensionTrace = document.getElementById("dimension-trace");
+  const dimensionMessage = document.getElementById("dimension-message");
+  const clearPathButton = document.getElementById("clear-path");
+  const pathSummary = document.getElementById("path-summary");
+  const pathSummaryText = document.getElementById("path-summary-text");
 
   const inspector = {
     kind: document.getElementById("inspector-kind"),
@@ -39,7 +46,9 @@
     startPanX: 0,
     startPanY: 0,
     view: "compare",
-    selectedId: null
+    selectedId: null,
+    density: "learn",
+    semantic: "overview"
   };
 
   const nodes = [];
@@ -650,6 +659,7 @@
       (node.omission ? " omission-block" : "");
     button.dataset.nodeId = node.id;
     button.dataset.lane = node.lane;
+    button.dataset.semantic = getNodeSemantic(node);
     button.style.left = node.x + "px";
     button.style.top = node.y + "px";
     button.style.width = node.w + "px";
@@ -672,6 +682,16 @@
       selectNode(node.id);
     });
     return button;
+  }
+
+  function getNodeSemantic(node) {
+    if (/^(wa_|nd_|td_|diff_)/.test(node.id)) return "detail";
+    if (node.mini && !node.omission) return "structure";
+    return "overview";
+  }
+
+  function semanticRank(level) {
+    return { overview: 0, structure: 1, detail: 2 }[level] || 0;
   }
 
   function marker(id, color) {
@@ -714,6 +734,9 @@
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.setAttribute("d", pathData);
       path.setAttribute("class", "connector-path " + connection.className);
+      path.dataset.from = connection.from;
+      path.dataset.to = connection.to;
+      path.dataset.semantic = semanticRank(getNodeSemantic(from)) >= semanticRank(getNodeSemantic(to)) ? getNodeSemantic(from) : getNodeSemantic(to);
       connectorLayer.appendChild(path);
     });
 
@@ -756,11 +779,13 @@
     feed.setAttribute("d", "M " + sourceX + " " + sourceY + " L " + elbowX + " " + sourceY +
       " L " + elbowX + " " + busY);
     feed.setAttribute("class", "connector-path action action-bus-feed");
+    feed.dataset.semantic = "structure";
     connectorLayer.appendChild(feed);
 
     const trunk = document.createElementNS("http://www.w3.org/2000/svg", "path");
     trunk.setAttribute("d", "M " + busStartX + " " + busY + " L " + busEndX + " " + busY);
     trunk.setAttribute("class", "connector-path action action-bus");
+    trunk.dataset.semantic = "structure";
     connectorLayer.appendChild(trunk);
 
     const feedJunction = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -775,6 +800,7 @@
       const injection = document.createElementNS("http://www.w3.org/2000/svg", "path");
       injection.setAttribute("d", "M " + targetX + " " + busY + " L " + targetX + " " + target.y);
       injection.setAttribute("class", "connector-path action action-injection");
+      injection.dataset.semantic = "structure";
       connectorLayer.appendChild(injection);
 
       const junction = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -802,17 +828,20 @@
     const feed = document.createElementNS("http://www.w3.org/2000/svg", "path");
     feed.setAttribute("d", "M " + sourceX + " " + sourceY + " L " + sourceX + " " + busY);
     feed.setAttribute("class", "connector-path action spatial-param-feed");
+    feed.dataset.semantic = "detail";
     connectorLayer.appendChild(feed);
 
     const bus = document.createElementNS("http://www.w3.org/2000/svg", "path");
     bus.setAttribute("d", "M " + busStartX + " " + busY + " L " + busEndX + " " + busY);
     bus.setAttribute("class", "connector-path action spatial-param-bus");
+    bus.dataset.semantic = "detail";
     connectorLayer.appendChild(bus);
 
     targets.forEach(function (target, index) {
       const injection = document.createElementNS("http://www.w3.org/2000/svg", "path");
       injection.setAttribute("d", "M " + centers[index] + " " + busY + " L " + centers[index] + " " + target.y);
       injection.setAttribute("class", "connector-path action spatial-param-injection");
+      injection.dataset.semantic = "detail";
       connectorLayer.appendChild(injection);
     });
   }
@@ -820,6 +849,22 @@
   function renderNodes() {
     nodes.forEach(function (node) {
       nodeLayer.appendChild(createNodeElement(node));
+    });
+  }
+
+  function renderSemanticSummary() {
+    const summaries = [
+      { lane: "native", y: 210, label: "Open-Sora", items: ["Video Input", "t + fps + text", "28× Spatial → Temporal", "Final + Output"] },
+      { lane: "wmpo", y: 670, label: "WMPO", items: ["Video + Action", "Action / timestep conditions", "28× Action-Spatial → Causal-Temporal", "Final + Output"] }
+    ];
+    summaries.forEach(function (summary) {
+      const flow = document.createElement("div");
+      flow.className = "semantic-summary-flow " + summary.lane;
+      flow.style.top = summary.y + "px";
+      flow.innerHTML = "<strong>" + summary.label + "</strong>" + summary.items.map(function (item, index) {
+        return (index ? "<i>→</i>" : "") + "<span>" + item + "</span>";
+      }).join("");
+      nodeLayer.appendChild(flow);
     });
   }
 
@@ -853,6 +898,53 @@
         ? (node.type === "SPATIAL" ? "Spatial Block " : "Temporal Block ") + node.label
         : node.label);
     renderInspector(node.meta, title, node.type);
+    focusConnectedPath(id, title);
+    updateDimensionTrace(id);
+  }
+
+  function focusConnectedPath(id, title) {
+    const active = new Set([id]);
+    const upstream = [id];
+    const downstream = [id];
+    while (upstream.length) {
+      const current = upstream.shift();
+      connections.forEach(function (edge) {
+        if (edge.to === current && !active.has(edge.from)) { active.add(edge.from); upstream.push(edge.from); }
+      });
+    }
+    while (downstream.length) {
+      const current = downstream.shift();
+      connections.forEach(function (edge) {
+        if (edge.from === current && !active.has(edge.to)) { active.add(edge.to); downstream.push(edge.to); }
+      });
+    }
+    canvas.classList.add("is-path-focus");
+    document.querySelectorAll(".arch-node").forEach(function (element) {
+      element.classList.toggle("path-active", active.has(element.dataset.nodeId));
+    });
+    document.querySelectorAll(".connector-path[data-from]").forEach(function (path) {
+      path.classList.toggle("path-active", active.has(path.dataset.from) && active.has(path.dataset.to));
+    });
+    clearPathButton.hidden = false;
+    pathSummary.hidden = false;
+    pathSummaryText.textContent = title + "：已高亮产生它的上游与消费它的下游；其余结构降为背景。";
+  }
+
+  function clearPathFocus() {
+    canvas.classList.remove("is-path-focus");
+    document.querySelectorAll(".path-active").forEach(function (element) { element.classList.remove("path-active"); });
+    clearPathButton.hidden = true;
+    pathSummary.hidden = true;
+  }
+
+  function updateDimensionTrace(id) {
+    const isTemporal = /^td_|_t_/.test(id) || id.includes("temporal");
+    const isSpatial = /^wa_|_s_/.test(id) || id.includes("spatial");
+    dimensionTrace.classList.toggle("spatial", isSpatial && !isTemporal);
+    dimensionTrace.classList.toggle("temporal", isTemporal);
+    dimensionMessage.textContent = isTemporal
+      ? "Temporal：B 与 S 合并为 B·S，Attention 沿 T=12 计算。"
+      : (isSpatial ? "Spatial：B 与 T 合并为 B·T，Attention 沿 S 计算。" : "保持视频身份 [B,T,S,C]；C=1152。 ");
   }
 
   function renderOverviewInspector() {
@@ -894,7 +986,16 @@
     clampPan();
     canvas.style.transform = "translate(" + state.panX + "px," + state.panY + "px) scale(" + state.scale + ")";
     zoomValue.textContent = Math.round(state.scale * 100) + "%";
+    applySemanticZoom();
     updateMinimap();
+  }
+
+  function applySemanticZoom() {
+    const next = state.scale < .45 ? "overview" : (state.scale < .75 ? "structure" : "detail");
+    state.semantic = next;
+    canvas.classList.remove("semantic-overview", "semantic-structure", "semantic-detail");
+    canvas.classList.add("semantic-" + next);
+    semanticLevel.textContent = { overview: "总览层级", structure: "结构层级", detail: "计算层级" }[next];
   }
 
   function fitView() {
@@ -925,6 +1026,7 @@
 
   function focusRegion(region) {
     if (region.id === "full") {
+      clearPathFocus();
       fitView();
       renderOverviewInspector();
       return;
@@ -960,16 +1062,28 @@
     });
   }
 
+  function setDensity(density) {
+    state.density = density;
+    canvas.classList.remove("density-learn", "density-structure", "density-source");
+    canvas.classList.add("density-" + density);
+    document.body.dataset.density = density;
+    densityButtons.forEach(function (button) {
+      const active = button.dataset.density === density;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+
   function initInteractions() {
     viewButtons.forEach(function (button) {
       button.addEventListener("click", function () {
         setView(button.dataset.view);
       });
     });
-
-    document.getElementById("shape-toggle").addEventListener("change", function (event) {
-      canvas.classList.toggle("hide-shapes", !event.target.checked);
+    densityButtons.forEach(function (button) {
+      button.addEventListener("click", function () { setDensity(button.dataset.density); });
     });
+    clearPathButton.addEventListener("click", clearPathFocus);
     document.getElementById("zoom-in").addEventListener("click", function () {
       setZoom(state.scale + 0.1);
     });
@@ -1079,8 +1193,10 @@
     connectCore();
     renderConnectors();
     renderNodes();
+    renderSemanticSummary();
     renderOverviewInspector();
     setView("compare");
+    setDensity("learn");
     initInteractions();
     window.requestAnimationFrame(fitView);
   }

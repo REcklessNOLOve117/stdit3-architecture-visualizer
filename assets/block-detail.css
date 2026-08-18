@@ -162,6 +162,9 @@ h1 { margin: 0; font-size: clamp(1.25rem, 2.2vw, 2rem); }
 .diagram-toolbar span { color: var(--green); font-size: .68rem; font-weight: 800; letter-spacing: .13em; }
 .diagram-toolbar strong { font-size: .97rem; }
 .diagram-toolbar p { margin: 0; color: var(--muted); font-size: .78rem; }
+.flow-mode { display: flex !important; grid-auto-flow: column; gap: .35rem !important; }
+.flow-button { padding: .45rem .75rem; border: 1px solid var(--line); border-radius: .45rem; background: var(--panel-2); color: var(--muted); cursor: pointer; }
+.flow-button.is-active { border-color: var(--green); background: rgba(84,230,162,.12); color: var(--text); }
 
 .diagram-view {
   min-height: 0;
@@ -181,6 +184,7 @@ h1 { margin: 0; font-size: clamp(1.25rem, 2.2vw, 2rem); }
   min-height: 650px;
   margin: 0 auto;
   overflow: visible;
+  transform: scaleY(-1);
 }
 
 .block-svg text {
@@ -190,6 +194,9 @@ h1 { margin: 0; font-size: clamp(1.25rem, 2.2vw, 2rem); }
   font-weight: 720;
   text-anchor: middle;
   pointer-events: none;
+  transform: scaleY(-1);
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .block-svg .shape { fill: #d7e5ea; font-size: 12px; font-weight: 540; }
@@ -206,7 +213,7 @@ h1 { margin: 0; font-size: clamp(1.25rem, 2.2vw, 2rem); }
 .temporal-boundary { stroke: rgba(112, 199, 255, .55); }
 .native-boundary { stroke: rgba(196, 154, 255, .55); }
 
-.main-path, .branch-path, .residual-path, .condition-path, .condition-bus, .text-condition-path {
+.main-path, .branch-path, .residual-path, .condition-path, .condition-bus, .text-condition-path, .ghost-path {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -216,6 +223,9 @@ h1 { margin: 0; font-size: clamp(1.25rem, 2.2vw, 2rem); }
 .residual-path { stroke: #91a7b4; stroke-width: 2.6; }
 .condition-bus, .condition-path { stroke: var(--orange); stroke-width: 2.5; stroke-dasharray: 7 6; }
 .text-condition-path { stroke: var(--cyan); stroke-width: 2.7; stroke-dasharray: 8 5; }
+.ghost-path { stroke: var(--red); stroke-width: 2.3; stroke-dasharray: 3 7; }
+.ghost-x { fill: var(--red) !important; font-size: 22px !important; }
+.ghost-module { opacity: .58; }
 
 .diagram-view[data-view-panel="spatial"] .main-path { marker-end: url(#spatial-arrow); }
 .diagram-view[data-view-panel="temporal"] .main-path { marker-end: url(#temporal-arrow); }
@@ -285,6 +295,22 @@ h1 { margin: 0; font-size: clamp(1.25rem, 2.2vw, 2rem); }
 .pair-strip strong { font-size: .78rem; line-height: 1.4; }
 .pair-strip > i { align-self: center; color: var(--green); font-style: normal; }
 .pair-strip .repeat { border-color: rgba(84, 230, 162, .45); }
+
+.backward-overlay { min-height: min(75vh,1120px); padding: 1.4rem; background: linear-gradient(rgba(65,91,106,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(65,91,106,.08) 1px,transparent 1px); background-size:24px 24px; }
+.backward-overlay[hidden] { display:none; }
+.backward-overlay header { max-width: 760px; margin: 0 auto 1.1rem; text-align:center; }
+.backward-overlay header small { color:var(--purple); font-weight:800; letter-spacing:.12em; }
+.backward-overlay h2 { margin:.35rem 0; }
+.backward-overlay p { margin:0; color:var(--muted); }
+.gradient-flow { display:flex; max-width:760px; flex-direction:column; align-items:center; margin:auto; }
+.gradient-flow div { display:grid; width:min(420px,100%); gap:.35rem; padding:.8rem 1rem; border:1px solid rgba(196,154,255,.55); border-radius:.7rem; background:rgba(65,45,90,.28); text-align:center; }
+.gradient-flow b { color:#eadcff; }
+.gradient-flow code { color:#d6c5ef; }
+.gradient-flow i { color:var(--purple); font-size:1.4rem; font-style:normal; }
+.gradient-branches { display:grid; max-width:900px; grid-template-columns:repeat(3,1fr); gap:.7rem; margin:1.2rem auto 0; }
+.gradient-branches span { padding:.8rem; border-left:3px solid var(--purple); background:rgba(196,154,255,.07); color:var(--muted); font-size:.76rem; }
+.gradient-branches b { display:block; margin-bottom:.25rem; color:#eadcff; }
+.diagram-stage.backward-mode .diagram-view,.diagram-stage.backward-mode .pair-strip { display:none!important; }
 
 .module-inspector {
   align-self: start;

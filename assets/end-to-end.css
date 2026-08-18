@@ -17,11 +17,14 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .header-spec span{font-size:.72rem}
 .unified-shell{height:calc(100vh - 104px);display:grid;grid-template-rows:54px 1fr}
 .canvas-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.55rem 1rem;border-bottom:1px solid var(--line);background:#0a1721}
-.zoom-group,.focus-group{display:flex;gap:.35rem}
+.zoom-group,.focus-group,.density-group{display:flex;gap:.35rem}
 .canvas-toolbar button,.canvas-toolbar output{height:34px;padding:0 .65rem;border:1px solid var(--line);border-radius:.45rem;background:var(--panel2);color:var(--text);font-size:.72rem}
 .canvas-toolbar button{cursor:pointer}
 .canvas-toolbar button:hover{border-color:#5c7b8c}
 .canvas-toolbar output{display:grid;min-width:55px;place-items:center;color:var(--action)}
+.semantic-level{display:grid;place-items:center;padding:0 .55rem;color:var(--time);font:700 10px "Cascadia Code",monospace;white-space:nowrap}
+#clear-path[hidden]{display:none}
+.density-button.is-active{border-color:var(--action)!important;background:rgba(85,223,160,.14)!important;color:#e5fff3!important}
 .canvas-toolbar p{margin:0;color:var(--muted);font-size:.68rem}
 .architecture-viewport{position:relative;overflow:hidden;cursor:grab;touch-action:none;background:linear-gradient(rgba(57,83,98,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(57,83,98,.1) 1px,transparent 1px),#07121b;background-size:28px 28px}
 .architecture-viewport.is-dragging{cursor:grabbing}
@@ -30,13 +33,13 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .connector-layer path{fill:none;stroke-linecap:round;stroke-linejoin:round}
 .main-wire{stroke:#9eb4be;stroke-width:3;marker-end:url(#arrow-main)}
 #arrow-main path{fill:#9eb4be}
-.zoom-wire{stroke:#7de6ed;stroke-width:3;stroke-dasharray:10 8;marker-end:url(#arrow-zoom)}
+.zoom-wire{stroke:#7de6ed;stroke-width:2.5;stroke-dasharray:2 8;marker-end:url(#arrow-zoom)}
 #arrow-zoom path{fill:#7de6ed}
 .action-wire{stroke:var(--action);stroke-width:2.5;stroke-dasharray:7 6;marker-end:url(#arrow-action)}
 #arrow-action path{fill:var(--action)}
 .time-wire{stroke:var(--time);stroke-width:2.5;stroke-dasharray:7 6;marker-end:url(#arrow-time)}
 #arrow-time path{fill:var(--time)}
-.handoff-wire{stroke:#7fe7ba;stroke-width:4;marker-end:url(#arrow-handoff)}
+.handoff-wire{stroke:#7fe7ba;stroke-width:3;marker-end:url(#arrow-handoff)}
 #arrow-handoff path{fill:#7fe7ba}
 .wire-label,.action-label,.time-label{font-size:13px;font-weight:700;fill:#b7d3dc}
 .action-label{fill:var(--action)}
@@ -66,6 +69,22 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .architecture-canvas.is-routing-focus .global-panel,.architecture-canvas.is-routing-focus .attention-panel,.architecture-canvas.is-routing-focus .mlp-panel,.architecture-canvas.is-routing-focus .final-panel{opacity:.12}
 .architecture-canvas.is-routing-focus #temporal-block,.architecture-canvas.is-routing-focus .spatial-temporal-bridge{opacity:.2}
 .architecture-canvas.is-routing-focus .condition-panel,.architecture-canvas.is-routing-focus .block-panel{box-shadow:0 0 0 3px rgba(85,223,160,.16),0 18px 40px rgba(0,0,0,.18)}
+.architecture-canvas.semantic-overview .canvas-panel>:not(header),.architecture-canvas.semantic-overview .connector-label,.architecture-canvas.semantic-overview .connector-port{opacity:0;pointer-events:none}
+.architecture-canvas.semantic-overview .attention-panel,.architecture-canvas.semantic-overview .mlp-panel{opacity:.18}
+.architecture-canvas.semantic-overview .canvas-panel>header{min-height:120px;align-items:center;justify-content:center;text-align:center}
+.architecture-canvas.semantic-overview .canvas-panel>header small,.architecture-canvas.semantic-overview .canvas-panel>header code{display:none}
+.architecture-canvas.semantic-overview .canvas-panel>header h3{font-size:34px}
+.architecture-canvas.semantic-overview #dynamic-connectors{opacity:0}
+.semantic-summary-flow{display:none;position:absolute;z-index:18;left:170px;top:720px;width:2500px;align-items:center;gap:30px}
+.architecture-canvas.semantic-overview .semantic-summary-flow{display:flex}
+.semantic-summary-flow span{display:grid;min-height:150px;flex:1;place-items:center;padding:20px;border:4px solid var(--action);border-radius:18px;background:#102a25;color:var(--text);font-size:32px;font-weight:800;text-align:center}
+.semantic-summary-flow i{color:#9ff1ca;font-size:56px;font-style:normal}
+.architecture-canvas.semantic-structure .op-chain,.architecture-canvas.semantic-structure .attention-inner,.architecture-canvas.semantic-structure .mlp-inner,.architecture-canvas.semantic-structure .final-notes{opacity:0;pointer-events:none}
+.architecture-canvas.density-learn code,.architecture-canvas.density-learn small,.architecture-canvas.density-learn .op-chain,.architecture-canvas.density-learn .final-notes,.architecture-canvas.density-learn .routing-map{display:none}
+.architecture-canvas.density-structure .op-chain,.architecture-canvas.density-structure .final-notes{display:none}
+.architecture-canvas.is-path-focus .arch-node:not(.path-active),.architecture-canvas.is-path-focus .small-node:not(.path-active),.architecture-canvas.is-path-focus .micro-node:not(.path-active),.architecture-canvas.is-path-focus .plus:not(.path-active),.architecture-canvas.is-path-focus .bridge-node:not(.path-active),.architecture-canvas.is-path-focus #dynamic-connectors path:not(.path-active),.architecture-canvas.is-path-focus .connector-port:not(.path-active){opacity:.12;filter:grayscale(.7)}
+.architecture-canvas.is-path-focus .path-active{opacity:1!important;filter:none!important;box-shadow:0 0 0 3px rgba(85,223,160,.28)}
+.architecture-canvas.is-path-focus path.path-active{stroke-width:5}
 .canvas-title{position:absolute;left:50px;top:32px}
 .canvas-title span,.canvas-panel header small{color:var(--action);font-size:11px;font-weight:800;letter-spacing:.13em}
 .canvas-title h2{margin:5px 0 4px;font-size:28px}
@@ -91,6 +110,18 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .canvas-inspector p{margin:0;color:#bed0d7;font-size:12px;line-height:1.55}
 .canvas-inspector>code{display:block;margin:11px 0;padding:9px 10px;background:#102731;color:#ddf5e8;border-radius:7px;font-size:11px}
 .canvas-inspector small{display:block;padding-top:10px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}
+.tensor-trace{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+.tensor-trace[hidden]{display:none}
+.tensor-trace div{padding:7px;background:#102731}
+.tensor-trace dt{color:var(--muted);font-size:8px;text-transform:uppercase}
+.tensor-trace dd{margin:3px 0 0;color:#dff7ea;font-size:10px}
+.dimension-trace{position:absolute;z-index:19;right:14px;top:14px;width:265px;padding:10px;border:1px solid var(--line);border-radius:9px;background:rgba(8,25,35,.94);pointer-events:none}
+.dimension-trace>strong{color:#7de6ed;font-size:10px;letter-spacing:.08em}
+.dimension-trace>div{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:7px}
+.dimension-trace span{display:grid;padding:5px;background:#102731;font:800 12px "Cascadia Code",monospace;text-align:center}
+.dimension-trace small{color:var(--muted);font:400 8px Inter,sans-serif}
+.dimension-trace p{margin:7px 0 0;color:var(--muted);font-size:9px}
+.dimension-trace.spatial span:nth-child(1),.dimension-trace.spatial span:nth-child(2),.dimension-trace.temporal span:nth-child(1),.dimension-trace.temporal span:nth-child(3){background:rgba(85,223,160,.16);color:#9ff1ca}
 .global-row{display:flex;align-items:center;justify-content:space-between;padding:24px 16px 10px;gap:60px}
 .arch-node,.small-node,.micro-node{color:var(--text);font-family:inherit}
 .arch-node{display:grid;gap:5px;width:140px;min-height:92px;padding:11px;border:1px solid #547080;border-radius:9px;background:#122633;text-align:left;cursor:pointer}
@@ -142,13 +173,17 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .wire-sample.action-sample{border-top:3px dashed var(--action)}
 .block-columns{display:grid;grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr);align-items:start;gap:8px;padding:15px}
 .single-block{border:1px solid var(--line);border-radius:9px;background:#0b1b25;overflow:hidden}
-.single-block h4{margin:0;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px}
-.single-block h4 span{float:right;color:var(--action);font-size:10px}
-.temporal-block h4 span{color:var(--time)}
+.single-block h4{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0;padding:8px 10px;border-bottom:1px solid var(--line);font-size:14px}
+.single-block h4>span{color:var(--action);font-size:10px}
+.temporal-block h4>span{color:var(--time)}
+.block-head-tags{display:flex;align-items:center;gap:5px}
+.block-head-tags em{font-style:normal;white-space:nowrap}
+.off-tag{padding:3px 5px;border:1px dashed rgba(255,126,136,.55);border-radius:4px;background:rgba(255,126,136,.08);color:#ffadb4;font:700 7px Inter,sans-serif;white-space:nowrap;cursor:pointer}
 .block-inner{position:relative;display:flex;flex-direction:column;align-items:center;min-height:1030px;padding:18px 54px 15px 20px}
 .block-inner>i{z-index:2;color:var(--muted);font-size:10px;font-style:normal;line-height:1.6}
 .micro-node{z-index:2;display:grid;gap:2px;width:185px;min-height:47px;padding:7px;border:1px solid var(--line);border-radius:7px;background:#152833;place-content:center;text-align:center;font-size:12px}
 .micro-node small{font-size:9px;color:#d7e5ea}
+.local-zoom-ref{display:block;margin-top:3px;color:#7de6ed;font:700 7px "Cascadia Code",monospace;letter-spacing:.03em}
 .micro-node.norm{border-color:var(--norm);background:rgba(244,211,109,.12)}
 .micro-node.adaln,.micro-node.timestep-adaln{border-color:var(--adaln);background:rgba(255,149,99,.12)}
 .micro-node.attention{border-color:var(--attention);background:rgba(98,217,158,.12);cursor:pointer}
@@ -170,9 +205,9 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .x2-output b,.x2-input b{font-size:14px}
 .x2-output small,.x2-input small{font-size:11px}
 .x2-output em,.x2-input em{color:#9ff1ca;font-size:11px;font-style:normal;font-weight:800;letter-spacing:.04em}
-.spatial-temporal-bridge{align-self:stretch;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;min-width:0;padding-top:680px;border-right:1px dashed rgba(127,231,186,.24);border-left:1px dashed rgba(127,231,186,.24);background:linear-gradient(180deg,transparent 35%,rgba(85,223,160,.06) 78%,transparent);text-align:center}
+.spatial-temporal-bridge{align-self:stretch;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;min-width:0;padding-top:705px;border-right:1px dashed rgba(127,231,186,.18);border-left:1px dashed rgba(127,231,186,.18);background:linear-gradient(180deg,transparent 42%,rgba(85,223,160,.045) 76%,transparent);text-align:center}
 .spatial-temporal-bridge>span{color:#9ff1ca;font-size:9px;font-weight:800;letter-spacing:.12em}
-.bridge-node{display:grid;gap:6px;width:138px;min-height:120px;padding:10px 7px;border:2px solid #7fe7ba;border-radius:9px;background:#102a27;color:var(--text);place-content:center;text-align:center;cursor:pointer;box-shadow:0 0 22px rgba(85,223,160,.16)}
+.bridge-node{display:grid;gap:5px;width:132px;min-height:94px;padding:8px 6px;border:1px solid #7fe7ba;border-radius:9px;background:#102a27;color:var(--text);place-content:center;text-align:center;cursor:pointer}
 .bridge-node b{font-size:13px;line-height:1.35}
 .bridge-node code{color:#ddf8ea;font-size:11px;line-height:1.55}
 .bridge-node small{color:#9ff1ca;font-size:10px;line-height:1.45}
