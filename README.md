@@ -61,3 +61,7 @@
 - `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\dependencies\opensora\opensora\datasets\simplevla_webdataset.py`
 
 页面中的 WMPO 示例采用源码默认 `To=4`、`Ta=8`、`action_dim=7`；符号形状仍适用于其他帧数和 action 维度。
+
+## Bib
+https://github.com/WM-PO/WMPO/
+[https://github.com/hpcaitech/Open-Sora](https://github.com/hpcaitech/Open-Sora/tree/opensora/v1.3)
