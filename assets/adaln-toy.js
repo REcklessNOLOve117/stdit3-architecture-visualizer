@@ -15,7 +15,7 @@
   const titles = [
     "ActionEncoder：把物理动作翻译成 condition",
     "Action embedding 与 timestep embedding 相加",
-    "t_block 生成 Attention 与 MLP 的 6 组参数",
+    "6H = 6 组 × 每组 H 维：把 12 个数切成 6 个二维向量",
     "Video hidden 先经过 LayerNorm",
     "Self-Attention 前的第一处 Action-AdaLN",
     "Action 改变 Q/K/V，gate 控制残差写回",

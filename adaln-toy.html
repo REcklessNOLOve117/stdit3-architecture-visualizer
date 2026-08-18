@@ -30,7 +30,7 @@
       <p class="nav-label">STEP BY STEP</p>
       <button type="button" class="step-button is-active" data-step="0"><span>01</span><strong>ActionEncoder</strong><small>2 → 4 → 2</small></button>
       <button type="button" class="step-button" data-step="1"><span>02</span><strong>加 timestep</strong><small>得到逐帧 condition</small></button>
-      <button type="button" class="step-button" data-step="2"><span>03</span><strong>生成 6 组参数</strong><small>t_block: 2 → 12</small></button>
+      <button type="button" class="step-button" data-step="2"><span>03</span><strong>拆开 6H</strong><small>6 组 × 每组 H 维</small></button>
       <button type="button" class="step-button" data-step="3"><span>04</span><strong>Video 与 LayerNorm</strong><small>两个 patch</small></button>
       <button type="button" class="step-button" data-step="4"><span>05</span><strong>Attention 前 AdaLN</strong><small>shift_msa / scale_msa</small></button>
       <button type="button" class="step-button" data-step="5"><span>06</span><strong>Attention 与 gate</strong><small>写回 residual</small></button>
@@ -117,34 +117,65 @@
         <article class="lesson-step" data-step-panel="2">
           <div class="step-heading">
             <p>STEP 03 · t_block</p>
-            <h2><code>c=[1.995,0.647]</code> 投影成两条残差支路的 6 组参数</h2>
-            <span class="takeaway">输出是调制参数，不是一个新的 feature layer。</span>
+            <h2><code>6H</code> 不是 6 个数，而是 <code>6 组 × 每组 H 个数</code></h2>
+            <span class="takeaway">本例 H=2，所以 t_block 输出 6×2=12 个数；每连续 2 个数构成一组 H 维向量。</span>
           </div>
 
           <div class="parameter-source">
-            <div class="flow-node condition"><small>condition cᵢ</small><strong>[1.995, 0.647]</strong><em>2D</em></div>
+            <div class="flow-node condition"><small>condition cᵢ</small><strong>[1.995, 0.647]</strong><em>H = 2 个数</em></div>
             <i>→</i>
-            <div class="flow-node action"><small>t_block</small><strong>2 → 12</strong><em>6 × hidden</em></div>
+            <div class="tblock-node">
+              <small>t_block</small>
+              <span>SiLU</span>
+              <i>→</i>
+              <span>Linear(H, 6H)</span>
+              <strong>2 → 12</strong>
+            </div>
             <i>→</i>
-            <div class="split-dot">分成 6 组</div>
+            <div class="sixh-result"><small>一条长向量</small><strong>6H = 6 × 2 = 12</strong><em>12 个数</em></div>
           </div>
 
-          <div class="parameter-groups">
+          <section class="sixh-explainer" aria-labelledby="sixh-title">
+            <div class="sixh-title-row">
+              <div><small>t_block 的原始输出</small><h3 id="sixh-title">最后一维长度 = 12</h3></div>
+              <code>[B·T, 12]</code>
+            </div>
+
+            <div class="twelve-values" aria-label="12 个输出值，按顺序每两个切成一组">
+              <div class="parameter-pair attn-mod"><span class="pair-index">第 1 组</span><b>shift_msa</b><div><code>0.10</code><code>−0.20</code></div><small>H=2 个通道</small></div>
+              <div class="parameter-pair attn-mod"><span class="pair-index">第 2 组</span><b>scale_msa</b><div><code>0.05</code><code>0.10</code></div><small>H=2 个通道</small></div>
+              <div class="parameter-pair attn-gate"><span class="pair-index">第 3 组</span><b>gate_msa</b><div><code>0.80</code><code>0.70</code></div><small>H=2 个通道</small></div>
+              <div class="parameter-pair mlp-mod"><span class="pair-index">第 4 组</span><b>shift_mlp</b><div><code>−0.10</code><code>0.05</code></div><small>H=2 个通道</small></div>
+              <div class="parameter-pair mlp-mod"><span class="pair-index">第 5 组</span><b>scale_mlp</b><div><code>0.02</code><code>−0.03</code></div><small>H=2 个通道</small></div>
+              <div class="parameter-pair mlp-gate"><span class="pair-index">第 6 组</span><b>gate_mlp</b><div><code>0.60</code><code>0.90</code></div><small>H=2 个通道</small></div>
+            </div>
+
+            <div class="shape-pipeline" aria-label="源码中的 reshape、层参数相加、重新展平和切分顺序">
+              <div><small>t_block 输出</small><code>[B·T, 6H]</code></div><i>→</i>
+              <div><small>reshape</small><code>[B,T,6,H]</code></div><i>→</i>
+              <div><small>加本层 Table</small><code>+ [1,1,6,H]</code></div><i>→</i>
+              <div><small>rearrange</small><code>[B,T,1,6H]</code></div><i>→</i>
+              <div><small>chunk(6, dim=-1)</small><code>6 × [B,T,1,H]</code></div>
+            </div>
+            <p class="toy-table-note">为了只讲清 6H，这次手算把 <code>scale_shift_table</code> 设为 0；真实模型中每个 Spatial Block 都会先加上自己的一张 <code>[6,H]</code> 表。</p>
+          </section>
+
+          <div class="sixh-routing" aria-label="六组参数的使用位置">
             <section>
-              <h3>① Self-Attention 支路</h3>
-              <div class="parameter-row"><span>shift_msa</span><code>[ 0.10, −0.20 ]</code><small>加法偏移 β</small></div>
-              <div class="parameter-row"><span>scale_msa</span><code>[ 0.05, 0.10 ]</code><small>乘法缩放 γ</small></div>
-              <div class="parameter-row"><span>gate_msa</span><code>[ 0.80, 0.70 ]</code><small>残差门控 g</small></div>
+              <h3>Attention 半边</h3>
+              <div class="route-target"><code>shift_msa + scale_msa</code><i>→</i><b>Attention 前 AdaLN</b></div>
+              <div class="route-target"><code>gate_msa</code><i>→</i><b>Attention 输出写回</b></div>
             </section>
             <section>
-              <h3>② MLP 支路</h3>
-              <div class="parameter-row"><span>shift_mlp</span><code>[ −0.10, 0.05 ]</code><small>加法偏移 β</small></div>
-              <div class="parameter-row"><span>scale_mlp</span><code>[ 0.02, −0.03 ]</code><small>乘法缩放 γ</small></div>
-              <div class="parameter-row"><span>gate_mlp</span><code>[ 0.60, 0.90 ]</code><small>残差门控 g</small></div>
+              <h3>MLP 半边</h3>
+              <div class="route-target"><code>shift_mlp + scale_mlp</code><i>→</i><b>MLP 前 AdaLN</b></div>
+              <div class="route-target"><code>gate_mlp</code><i>→</i><b>MLP 输出写回</b></div>
             </section>
           </div>
 
-          <div class="real-map"><strong>真实 WMPO</strong><span>t_block: 1152 → 6912 = 6×1152，输出形状 [B,12,6,1152]。</span></div>
+          <div class="not-six-scalars"><strong>最容易误解的地方</strong><span><code>6H</code> ≠ 6 个标量。每一组都要逐通道调制 hidden，所以每组必须保留完整的 H 维。</span></div>
+
+          <div class="real-map"><strong>真实 WMPO</strong><span>H=1152：<code>[B·12,1152] → [B·12,6912]</code>，Block 内 reshape 为 <code>[B,12,6,1152]</code>。也就是 6 组参数，每组都有 1152 个通道值。</span></div>
         </article>
 
         <article class="lesson-step" data-step-panel="3">
@@ -357,7 +388,7 @@
       </dl>
       <div class="source-note">
         <b>源码范围</b>
-        <code>WMPO/.../stdit3.py<br>L141–205, L448–487</code>
+        <code>WMPO/.../stdit3.py<br>L141–149 · L295–298 · L448–457</code>
       </div>
     </aside>
   </main>

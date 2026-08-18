@@ -59,8 +59,13 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .architecture-canvas.is-handoff-focus .action-wire,.architecture-canvas.is-handoff-focus .time-wire{opacity:.18}
 .architecture-canvas.is-handoff-focus .connector-port.zoom{opacity:.08}
 .architecture-canvas.is-handoff-focus .connector-port.action,.architecture-canvas.is-handoff-focus .connector-port.time{opacity:.18}
-.architecture-canvas.is-handoff-focus .global-panel,.architecture-canvas.is-handoff-focus .condition-panel,.architecture-canvas.is-handoff-focus .attention-panel,.architecture-canvas.is-handoff-focus .mlp-panel,.architecture-canvas.is-handoff-focus .final-panel,.architecture-canvas.is-handoff-focus .canvas-inspector{opacity:.14}
+.architecture-canvas.is-handoff-focus .global-panel,.architecture-canvas.is-handoff-focus .condition-panel,.architecture-canvas.is-handoff-focus .attention-panel,.architecture-canvas.is-handoff-focus .mlp-panel,.architecture-canvas.is-handoff-focus .final-panel{opacity:.14}
 .architecture-canvas.is-handoff-focus .block-panel{box-shadow:0 0 0 3px rgba(127,231,186,.18),0 18px 40px rgba(0,0,0,.18)}
+.architecture-canvas.is-routing-focus .main-wire,.architecture-canvas.is-routing-focus .zoom-wire,.architecture-canvas.is-routing-focus .time-wire,.architecture-canvas.is-routing-focus .handoff-wire{opacity:.1}
+.architecture-canvas.is-routing-focus .connector-port.main,.architecture-canvas.is-routing-focus .connector-port.zoom,.architecture-canvas.is-routing-focus .connector-port.time,.architecture-canvas.is-routing-focus .connector-port.handoff{opacity:.1}
+.architecture-canvas.is-routing-focus .global-panel,.architecture-canvas.is-routing-focus .attention-panel,.architecture-canvas.is-routing-focus .mlp-panel,.architecture-canvas.is-routing-focus .final-panel{opacity:.12}
+.architecture-canvas.is-routing-focus #temporal-block,.architecture-canvas.is-routing-focus .spatial-temporal-bridge{opacity:.2}
+.architecture-canvas.is-routing-focus .condition-panel,.architecture-canvas.is-routing-focus .block-panel{box-shadow:0 0 0 3px rgba(85,223,160,.16),0 18px 40px rgba(0,0,0,.18)}
 .canvas-title{position:absolute;left:50px;top:32px}
 .canvas-title span,.canvas-panel header small{color:var(--action);font-size:11px;font-weight:800;letter-spacing:.13em}
 .canvas-title h2{margin:5px 0 4px;font-size:28px}
@@ -75,12 +80,17 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .attention-panel{left:1600px;top:150px;width:650px;height:820px;border-color:rgba(103,189,244,.58)}
 .mlp-panel{left:1600px;top:1010px;width:650px;height:330px;border-color:rgba(196,154,255,.5)}
 .final-panel{left:880px;top:1380px;width:1370px;height:270px;border-color:rgba(196,154,255,.5)}
-.canvas-inspector{position:absolute;left:2300px;top:1010px;width:500px;height:640px;padding:20px;border:1px solid rgba(85,223,160,.45);border-radius:14px;background:#0c1d27}
+.canvas-inspector{position:absolute;z-index:20;right:14px;bottom:14px;width:min(360px,calc(100% - 28px));max-height:300px;overflow:auto;padding:16px;border:1px solid rgba(85,223,160,.5);border-radius:12px;background:rgba(8,25,35,.96);box-shadow:0 18px 45px rgba(0,0,0,.38)}
+.canvas-inspector.is-collapsed{display:none}
+.inspector-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.inspector-head button{padding:4px 7px;border:1px solid var(--line);border-radius:5px;background:#102731;color:var(--muted);font-size:10px;cursor:pointer}
+.inspector-reopen{display:none;position:absolute;z-index:20;right:14px;bottom:14px;padding:8px 11px;border:1px solid rgba(85,223,160,.5);border-radius:7px;background:#102731;color:#9ff1ca;font-size:11px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.inspector-reopen.is-visible{display:block}
 .canvas-inspector span{color:var(--action);font-size:11px;font-weight:800;letter-spacing:.12em}
-.canvas-inspector h3{margin:8px 0;font-size:22px}
-.canvas-inspector p{color:#bed0d7;font-size:14px;line-height:1.65}
-.canvas-inspector>code{display:block;margin:16px 0;padding:12px;background:#102731;color:#ddf5e8;border-radius:7px;font-size:13px}
-.canvas-inspector small{display:block;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+.canvas-inspector h3{margin:7px 0;font-size:19px}
+.canvas-inspector p{margin:0;color:#bed0d7;font-size:12px;line-height:1.55}
+.canvas-inspector>code{display:block;margin:11px 0;padding:9px 10px;background:#102731;color:#ddf5e8;border-radius:7px;font-size:11px}
+.canvas-inspector small{display:block;padding-top:10px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}
 .global-row{display:flex;align-items:center;justify-content:space-between;padding:24px 16px 10px;gap:60px}
 .arch-node,.small-node,.micro-node{color:var(--text);font-family:inherit}
 .arch-node{display:grid;gap:5px;width:140px;min-height:92px;padding:11px;border:1px solid #547080;border-radius:9px;background:#122633;text-align:left;cursor:pointer}
@@ -108,9 +118,12 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .condition-columns{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}
 .condition-lane{display:flex;flex-direction:column;align-items:center}
 .condition-lane>i{color:var(--muted);font-size:11px;font-style:normal;line-height:1.55}
-.small-node{display:grid;gap:3px;width:240px;min-height:58px;padding:8px;border:1px solid var(--line);border-radius:7px;background:#122633;text-align:center;cursor:pointer}
+.small-node{display:grid;gap:5px;width:280px;min-height:58px;padding:8px;border:1px solid var(--line);border-radius:7px;background:#122633;text-align:center;cursor:pointer}
 .small-node b{font-size:12px}
 .small-node code{font-size:10px;color:#d7e8ed}
+.op-chain{display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
+.op-chain span,.op-chain em{padding:3px 5px;border:1px solid rgba(215,232,237,.16);border-radius:4px;background:rgba(215,232,237,.055);color:#d7e8ed;font-family:"Cascadia Code",monospace;font-size:8px;font-style:normal}
+.op-chain em{border-color:rgba(244,211,109,.45);background:rgba(244,211,109,.13);color:#ffe793;font-weight:800}
 .action-node{border-color:var(--action);background:rgba(85,223,160,.08)}
 .time-node{border-color:var(--time);background:rgba(255,173,104,.08)}
 .mixed-node{border-color:#b5d887;background:linear-gradient(90deg,rgba(85,223,160,.09),rgba(255,173,104,.09))}
@@ -166,6 +179,7 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .attention-mode{display:flex;gap:5px;margin-left:auto}
 .attention-mode button{padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:#0d1c26;color:var(--muted);font-size:10px;cursor:pointer}
 .attention-mode button.is-active{border-color:var(--action);background:rgba(85,223,160,.12);color:var(--text)}
+.focus-group button.is-active{border-color:var(--action);background:rgba(85,223,160,.13);color:#dffbed}
 .attention-inner{display:flex;flex-direction:column;align-items:center;padding:16px 25px}
 .attention-inner>i{color:var(--muted);font-size:10px;font-style:normal;line-height:2}
 .attn-box{display:grid;gap:3px;min-width:210px;padding:10px;border:1px solid #527185;border-radius:7px;background:#122633;text-align:center}
@@ -212,6 +226,7 @@ code{font-family:"Cascadia Code",Consolas,monospace}
 .canvas-toolbar{overflow-x:auto}
 .canvas-toolbar p{display:none}
 .focus-group{display:none}
+.canvas-inspector{right:8px;bottom:8px;width:min(330px,calc(100% - 16px));max-height:230px}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}
 }

@@ -13,17 +13,17 @@
     patch:["VIDEO TOKENIZATION","PatchEmbed3D","Conv3D 使用 kernel=stride=(1,2,2)，保持帧数不变，每个 2×2 latent patch 投影为一个 1152 维 token。","[B,4,12,Hx,Wx] → [B,12,S,1152]","layers/blocks.py · L79–129"],
     position:["POSITION","2D sin/cos 位置编码","为空间 H×W patch 生成位置编码，同一套编码沿 12 个时间位置广播。","[1,S,1152] + [B,12,S,1152]","layers/blocks.py · L944–993"],
     pairs:["BACKBONE","28 × Spatial → Temporal","每对先执行 action-conditioned Spatial Block，再执行 timestep-conditioned causal Temporal Block；28 对参数彼此独立。","全程 [B,12,S,1152]","WMPO stdit3.py · L484–487"],
-    final:["OUTPUT HEAD","T2IFinalLayer","全局 timestep 生成 final shift/scale，经过 LayerNorm、AdaLN 和 Linear 预测每个输出 patch。","1152 → 1·2·2·Cout","layers/blocks.py · L723–780"],
+    final:["OUTPUT HEAD","T2IFinalLayer","全局 timestep 先经过 SiLU + Linear 生成 final shift/scale，再用它调制无 affine 的 LayerNorm 输出，最后预测每个 latent patch。","Eₜ(t) → SiLU → Linear(1152,2304) → shift / scale","layers/blocks.py · L709–721"],
     unpatchify:["OUTPUT SHAPE","unpatchify","把每个 token 的 1×2×2 patch prediction 重新排列为 5D latent 网格。","[B,12,S,4·Cout] → [B,Cout,12,Hx,Wx]","WMPO stdit3.py · L503–520"],
     decoder:["OUTSIDE STDiT3","Sampler + VAE Decoder","模型输出仍是 latent 预测；采样器更新 xₜ，最终由 VAE Decoder 得到可见视频。","latent prediction → RGB","模型外部：sampling pipeline"],
     actions:["ACTION INPUT","8 个未来 7D actions","每个未来时间位置对应一个机器人动作向量，典型维度包含平移、旋转和 gripper。","[B,8,7]","simplevla_webdataset.py · Ta=8, action_dim=7"],
-    actionEncoder:["ACTION CONDITION","ActionEncoder","每个 action 独立经过两层 MLP 投影到 hidden size；它不直接加到 video token。","7 → 4608 → 1152","WMPO stdit3.py · L37–72"],
+    actionEncoder:["ACTION CONDITION","ActionEncoder","每个 7D action 独立经过 Linear、SiLU、Linear 投影到 hidden size。这里的 SiLU 属于 action 编码器；编码结果不直接加到 video token。","Linear(7,4608) → SiLU → Linear(4608,1152)","WMPO stdit3.py · L37–72"],
     none:["ACTION ALIGNMENT","prepend NONE ×4","在 8 个未来 action embedding 前补 4 个可学习 NONE，使条件与 12 帧位置一一对齐。","[B,8,1152] → [B,12,1152]","WMPO stdit3.py · L54–65"],
-    spatialCondition:["SPATIAL PARAMS","逐帧 Action + timestep 参数","每帧条件 Eₜ(t)+Eₐ(aᵢ) 经 t_block 变成六组参数。图中的绿色虚线只表示这些 shift / scale / gate 参数被路由到 Spatial Block 的对应计算位置；它不是 Spatial 输出或 x₂ 广播。","[B,12,6,1152]","WMPO stdit3.py · L448–456、L141–149"],
+    spatialCondition:["SPATIAL PARAMS","逐帧 Action + timestep 参数","每帧条件 cₛ=Eₜ(t)+Eₐ(aᵢ) 先过 SiLU，再由 Linear(1152,6912) 生成六组参数。绿色虚线只表示 shift / scale / gate 的路由，不是 Spatial 输出或 x₂ 广播。","cₛ → SiLU → Linear(1152,6·1152) → chunk(6)","WMPO stdit3.py · L295–298、L448–457"],
     timestep:["DIFFUSION CONDITION","timestep","标量 diffusion / flow 时间决定当前噪声强度。","[B]","WMPO stdit3.py · L448–462"],
-    tEmbed:["DIFFUSION CONDITION","TimestepEmbedder","先构造 256 维 sin/cos frequency embedding，再经 MLP 得到 1152 维全局条件。","[B] → [B,256] → [B,1152]","layers/blocks.py · L788–827"],
-    temporalCondition:["TEMPORAL PARAMS","Temporal t_block","Temporal Block 的六组参数只由全局 timestep 直接生成，并沿 T/S 广播。","[B,1,6,1152]","WMPO stdit3.py · L452–487"],
-    finalCondition:["FINAL PARAMS","Final shift / scale","Final Layer 只使用全局 timestep 与自己的 2×1152 scale_shift_table；action 已经写进 hidden。","2 × [B,1152]","layers/blocks.py · L730–763"],
+    tEmbed:["DIFFUSION CONDITION","TimestepEmbedder","先构造 256 维 sin/cos frequency embedding，再经过 Linear、SiLU、Linear 得到 1152 维全局条件。","[B] → sin/cos₍₂₅₆₎ → Linear → SiLU → Linear → [B,1152]","layers/blocks.py · L792–825"],
+    temporalCondition:["TEMPORAL PARAMS","Temporal t_block","全局 Eₜ(t) 经过同一个 t_block：SiLU + Linear(1152,6912)，再切成六组 Temporal AdaLN/gate 参数；这里不再加入 action embedding。","Eₜ(t) → SiLU → Linear(1152,6·1152) → chunk(6)","WMPO stdit3.py · L295–298、L456–488"],
+    finalCondition:["FINAL PARAMS","Final shift / scale","Final Layer 使用自己的 SiLU + Linear(1152,2304) 生成 shift/scale。它不直接读取 action；action 影响已经保存在 28 对 Block 输出的 hidden 中。","Eₜ(t) → SiLU → Linear(1152,2·1152) → shift, scale","layers/blocks.py · L709–721"],
     spatialAttn:["SPATIAL ATTENTION","Spatial Self-Attention","每帧的 S 个 patch 互相注意。Action 已通过前面的 Action-AdaLN 改变 Q/K/V 的输入。","[B·T,S,1152] → [B·T,S,1152]","WMPO stdit3.py · L156–181"],
     spatialX2:["SPATIAL OUTPUT","x₂：已经包含 action 影响","第二条 residual 把 action-conditioned MLP 更新量写回 hidden。Action 参数本身不会作为新 token 传给 Temporal；它们造成的数值变化保留在 x₂ 中。","x₂ = x₁ + gate_mlp(a,t) · MLP(AdaLN₂(x₁,a,t))","WMPO stdit3.py · L186–206"],
     temporalHandoff:["HIDDEN STATE HANDOFF","Spatial → Temporal 直接传递 x₂","两个 Block 之间没有独立 Action Layer，也没有先 reshape。Spatial Block 返回的 [B,T,S,C] x₂ 原样成为 Temporal Block 的 x。","[B,T,S,1152] → [B,T,S,1152]","WMPO stdit3.py · L485–488"],
@@ -32,6 +32,8 @@
     mlp:["FEED-FORWARD","MLP","逐 token 进行通道混合：先扩展到 4608，approx GELU，再投影回 1152。AdaLN 与 gate 位于 MLP 类外部。","1152 → 4608 → 1152","WMPO stdit3.py · L113–116、L186–204"]
   };
   const inspector = { kind:document.getElementById("detail-kind"), title:document.getElementById("detail-title"), description:document.getElementById("detail-description"), shape:document.getElementById("detail-shape"), source:document.getElementById("detail-source") };
+  const inspectorPanel=document.getElementById("canvas-inspector");
+  const inspectorReopen=document.getElementById("open-inspector");
 
   const connectorGroup = document.getElementById("dynamic-connectors");
   const NS = "http://www.w3.org/2000/svg";
@@ -110,15 +112,27 @@
   function fit(){ const sx=(viewport.clientWidth-30)/CW,sy=(viewport.clientHeight-30)/CH; state.scale=Math.max(.1,Math.min(.9,Math.min(sx,sy))); state.x=(viewport.clientWidth-CW*state.scale)/2; state.y=(viewport.clientHeight-CH*state.scale)/2; render(); }
   function zoom(next,cx=viewport.clientWidth/2,cy=viewport.clientHeight/2){ const old=state.scale; next=Math.max(.1,Math.min(1.35,next)); const px=(cx-state.x)/old,py=(cy-state.y)/old; state.scale=next; state.x=cx-px*next;state.y=cy-py*next;clamp();render(); }
   const regions={input:{x:20,y:100,w:820,h:900},condition:{x:20,y:950,w:820,h:750},block:{x:820,y:110,w:790,h:1270},handoff:{x:840,y:230,w:710,h:810},attention:{x:1570,y:110,w:720,h:1250},output:{x:830,y:1340,w:1460,h:340}};
-  function focus(name){ const r=regions[name]; if(!r)return; canvas.classList.toggle("is-handoff-focus",name==="handoff"); const s=Math.min((viewport.clientWidth-80)/r.w,(viewport.clientHeight-80)/r.h,.95); state.scale=Math.max(.3,s); state.x=viewport.clientWidth/2-(r.x+r.w/2)*state.scale; state.y=viewport.clientHeight/2-(r.y+r.h/2)*state.scale; clamp();render(); }
-  function showDetail(key){ const d=details[key]; if(!d)return; document.querySelectorAll(".detail-node").forEach(n=>n.classList.toggle("is-selected",n.dataset.detail===key)); inspector.kind.textContent=d[0];inspector.title.textContent=d[1];inspector.description.textContent=d[2];inspector.shape.textContent=d[3];inspector.source.textContent=d[4]; }
+  function setFocusMode(name){
+    canvas.classList.toggle("is-handoff-focus",name==="handoff");
+    canvas.classList.toggle("is-routing-focus",name==="condition");
+    document.querySelectorAll("[data-focus]").forEach(button=>{
+      const active=button.dataset.focus===name;
+      button.classList.toggle("is-active",active);
+      button.setAttribute("aria-pressed",String(active));
+    });
+  }
+  function focus(name){ const r=regions[name]; if(!r)return; setFocusMode(name); const s=Math.min((viewport.clientWidth-80)/r.w,(viewport.clientHeight-80)/r.h,.95); state.scale=Math.max(.3,s); state.x=viewport.clientWidth/2-(r.x+r.w/2)*state.scale; state.y=viewport.clientHeight/2-(r.y+r.h/2)*state.scale; clamp();render(); }
+  function setInspectorOpen(open){inspectorPanel.classList.toggle("is-collapsed",!open);inspectorReopen.classList.toggle("is-visible",!open);}
+  function showDetail(key){ const d=details[key]; if(!d)return; document.querySelectorAll(".detail-node").forEach(n=>n.classList.toggle("is-selected",n.dataset.detail===key)); inspector.kind.textContent=d[0];inspector.title.textContent=d[1];inspector.description.textContent=d[2];inspector.shape.textContent=d[3];inspector.source.textContent=d[4];setInspectorOpen(true); }
   document.querySelectorAll(".detail-node").forEach(n=>n.addEventListener("click",()=>showDetail(n.dataset.detail)));
+  document.getElementById("close-inspector").addEventListener("click",()=>setInspectorOpen(false));
+  inspectorReopen.addEventListener("click",()=>setInspectorOpen(true));
   document.getElementById("zoom-in").addEventListener("click",()=>zoom(state.scale+.1));
   document.getElementById("zoom-out").addEventListener("click",()=>zoom(state.scale-.1));
-  document.getElementById("fit-canvas").addEventListener("click",fit);
+  document.getElementById("fit-canvas").addEventListener("click",()=>{setFocusMode(null);fit();});
   document.getElementById("actual-size").addEventListener("click",()=>zoom(1));
   document.querySelectorAll("[data-focus]").forEach(b=>b.addEventListener("click",()=>focus(b.dataset.focus)));
-  viewport.addEventListener("pointerdown",e=>{if(e.target.closest("button,a"))return;state.drag=true;state.pointer=e.pointerId;state.startX=e.clientX;state.startY=e.clientY;state.originX=state.x;state.originY=state.y;viewport.classList.add("is-dragging");viewport.setPointerCapture(e.pointerId)});
+  viewport.addEventListener("pointerdown",e=>{if(e.target.closest("button,a,.canvas-inspector"))return;state.drag=true;state.pointer=e.pointerId;state.startX=e.clientX;state.startY=e.clientY;state.originX=state.x;state.originY=state.y;viewport.classList.add("is-dragging");viewport.setPointerCapture(e.pointerId)});
   viewport.addEventListener("pointermove",e=>{if(!state.drag||e.pointerId!==state.pointer)return;state.x=state.originX+e.clientX-state.startX;state.y=state.originY+e.clientY-state.startY;clamp();render()});
   function endDrag(e){if(!state.drag||e.pointerId!==state.pointer)return;state.drag=false;state.pointer=null;viewport.classList.remove("is-dragging")}
   viewport.addEventListener("pointerup",endDrag);viewport.addEventListener("pointercancel",endDrag);
@@ -129,6 +143,6 @@
   const modes={spatial:{input:"[B·T,S,1152]",q:"[B·T,16,S,72]",k:"[B·T,16,S,72]",v:"[B·T,16,S,72]",score:"[B·T,16,S,S]",weighted:"[B·T,16,S,72]",output:"[B·T,S,1152]",rope:"Spatial：无 RoPE",mask:"OFF",causal:false},temporal:{input:"[B·S,T,1152]",q:"[B·S,16,T,72]",k:"[B·S,16,T,72]",v:"[B·S,16,T,72]",score:"[B·S,16,T,T]",weighted:"[B·S,16,T,72]",output:"[B·S,T,1152]",rope:"Temporal：Q/K 使用 RoPE",mask:"下三角 ON",causal:true}};
   function setMode(key){const m=modes[key];document.getElementById("attn-input").textContent=m.input;document.getElementById("q-shape").textContent=m.q;document.getElementById("k-shape").textContent=m.k;document.getElementById("v-shape").textContent=m.v;document.getElementById("score-shape").textContent=m.score;document.getElementById("weighted-shape").textContent=m.weighted;document.getElementById("attn-output").textContent=m.output;document.getElementById("rope-state").textContent=m.rope;document.querySelector("#causal-mask code").textContent=m.mask;document.getElementById("causal-mask").classList.toggle("is-off",!m.causal);document.querySelectorAll("[data-attention]").forEach(b=>{const on=b.dataset.attention===key;b.classList.toggle("is-active",on);b.setAttribute("aria-pressed",String(on))})}
   document.querySelectorAll("[data-attention]").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.attention)));
-  showDetail("latent");setMode("spatial");requestAnimationFrame(()=>{fit();drawConnections();});
+  setFocusMode(null);showDetail("latent");setInspectorOpen(false);setMode("spatial");requestAnimationFrame(()=>{fit();drawConnections();});
   if(document.fonts?.ready)document.fonts.ready.then(drawConnections);
 })();
