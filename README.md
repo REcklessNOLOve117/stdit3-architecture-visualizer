@@ -5,8 +5,9 @@
 - Open-Sora `opensora/v1.3` 的原生 `STDiT3-XL/2`
 - WMPO `main` 中 action-conditioned STDiT3 世界模型
 
-目录包含五个互相链接的页面：
+目录包含六个互相链接的页面：
 
+- `system-loop.html`：从系统层解释 VLA Policy、World Model、Reward Model 如何交替生成 imagined trajectory、评分并通过 GRPO 更新 Policy，同时区分 Policy Behavior Alignment 对 World Model 的更新。
 - `index.html`：八步 forward 教学版。
 - `overview.html`：完整大架构总览；28 对主干以第 1–3、26–28 对和中间省略块表示。
 - `end-to-end.html`：一张可拖拽缩放的大画布，从 RGB/VAE 外部上下文和噪声 latent 输入开始，通过放大箭头依次展开 28 对主干、单个 Spatial/Temporal Pair、Attention QKV、MLP、Final Layer、unpatchify 与 latent 输出。
@@ -23,6 +24,12 @@
 - 使用“上一步 / 下一步”按 forward 顺序学习，也可以按键盘左右方向键。
 - “自动播放”每 4.5 秒前进一步，到第 8 步后停止。
 - 顶部八个步骤按钮可直接跳转。
+
+### WMPO 三模型闭环
+
+- 打开 `system-loop.html` 从系统层理解 VLA Policy、World Model 和 Reward Model 的职责边界。
+- 六个阶段按钮可分别高亮完整闭环、Policy 动作、World Model 想象、Reward 评分、GRPO 更新和 Policy Behavior Alignment。
+- 主闭环中 GRPO 只更新 Policy；World Model 与 Reward Model 作为环境和评估器。行为对齐是另一条单独更新 World Model 的辅助闭环。
 
 ### 完整架构总览
 
@@ -53,7 +60,7 @@
 ### 输入到输出精细架构
 
 - 从 `overview.html` 顶部的“输入到输出精细图”进入，或直接打开 `end-to-end.html`。
-- 所有模块都位于同一张画布，不再拆成多个纵向章节；粗虚线箭头表示从主干模块到内部实现的逐级放大关系。
+- 所有模块都位于同一张画布，不再拆成多个纵向章节；编号和节点内“详见”标签表示从主干模块到内部实现的逐级展开关系。
 - 左侧主干从 RGB/VAE 外部上下文开始，明确标出 STDiT3 真正的输入是噪声 latent `x_t`；中间展开一个完整 Spatial/Temporal Pair；右侧展开 Attention Q/K/V 和 MLP；底部展开 Final Layer 与 unpatchify。
 - 在画布空白处拖拽，使用滚轮或顶部按钮缩放；聚焦按钮可快速定位输入、条件、单层 Block、Attention/MLP 和输出。
 - Attention 面板可在 Spatial 与 Temporal causal 两种形状之间切换。

@@ -61,27 +61,23 @@
     {from:"#node-patch",to:"#node-position",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#node-position",to:"#node-pairs",kind:"main",fromSide:"right",toSide:"left"},
     {from:"#node-pairs",to:"#pair-1",kind:"main",fromSide:"bottom",toSide:"top"},
-    {from:"#pair-1",to:"#pair-2",kind:"main",fromSide:"right",toSide:"left"},
-    {from:"#pair-2",to:"#pair-27",kind:"main",fromSide:"bottom",toSide:"top",label:"… 中间 24 对 …"},
-    {from:"#pair-27",to:"#pair-28",kind:"main",fromSide:"right",toSide:"left"},
+    {from:"#pair-1",to:"#pair-2",kind:"main",fromSide:"bottom",toSide:"top"},
+    {from:"#pair-27",to:"#pair-28",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#pair-28",to:"#node-final",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#node-final",to:"#node-unpatchify",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#node-unpatchify",to:"#node-decoder",kind:"main",fromSide:"bottom",toSide:"top"},
     {from:"#spatial-output-x2",to:"#spatial-temporal-handoff",kind:"handoff",fromSide:"right",toSide:"left"},
     {from:"#spatial-temporal-handoff",to:"#temporal-input-x2",kind:"handoff",fromSide:"right",toSide:"left",route:"handoffRail",railGap:18},
 
-    {from:"#node-pairs",to:"#block-title",kind:"zoom",fromSide:"right",toSide:"left",label:"展开 Pair ℓ"},
-    {from:"#pair-28",to:"#final-expanded-input",kind:"zoom",fromSide:"right",toSide:"left",label:"Pair 28 输出"},
-
-    {from:"#cond-spatial-params",to:"#sp-adaln1",kind:"action",fromSide:"right",toSide:"left",route:"bus",busX:850},
-    {from:"#cond-spatial-params",to:"#sp-gate1",kind:"action",fromSide:"right",toSide:"left",route:"bus",busX:860},
-    {from:"#cond-spatial-params",to:"#sp-adaln2",kind:"action",fromSide:"right",toSide:"left",route:"bus",busX:870},
-    {from:"#cond-spatial-params",to:"#sp-gate2",kind:"action",fromSide:"right",toSide:"left",route:"bus",busX:880},
-    {from:"#cond-temporal-params",to:"#tm-adaln1",kind:"time",fromSide:"right",toSide:"right",route:"bus",busX:1534},
-    {from:"#cond-temporal-params",to:"#tm-gate1",kind:"time",fromSide:"right",toSide:"right",route:"bus",busX:1544},
-    {from:"#cond-temporal-params",to:"#tm-adaln2",kind:"time",fromSide:"right",toSide:"right",route:"bus",busX:1554},
-    {from:"#cond-temporal-params",to:"#tm-gate2",kind:"time",fromSide:"right",toSide:"right",route:"bus",busX:1564},
-    {from:"#cond-final-params",to:"#final-expanded-adaln",kind:"time",fromSide:"right",toSide:"top",route:"bus",busX:840,label:"Final shift / scale(t)"}
+    {from:"#cond-spatial-params",to:"#sp-adaln1",kind:"action",fromSide:"right",toSide:"left",route:"bus",busRef:"#block-panel",busRefSide:"left",busOffset:-18},
+    {from:"#cond-spatial-params",to:"#sp-gate1",kind:"action",fromSide:"right",toSide:"left",route:"bus",busRef:"#block-panel",busRefSide:"left",busOffset:-18},
+    {from:"#cond-spatial-params",to:"#sp-adaln2",kind:"action",fromSide:"right",toSide:"left",route:"bus",busRef:"#block-panel",busRefSide:"left",busOffset:-18},
+    {from:"#cond-spatial-params",to:"#sp-gate2",kind:"action",fromSide:"right",toSide:"left",route:"bus",busRef:"#block-panel",busRefSide:"left",busOffset:-18},
+    {from:"#cond-temporal-params",to:"#tm-adaln1",kind:"time",fromSide:"right",toSide:"right",route:"bus",busRef:"#block-panel",busRefSide:"right",busOffset:18},
+    {from:"#cond-temporal-params",to:"#tm-gate1",kind:"time",fromSide:"right",toSide:"right",route:"bus",busRef:"#block-panel",busRefSide:"right",busOffset:18},
+    {from:"#cond-temporal-params",to:"#tm-adaln2",kind:"time",fromSide:"right",toSide:"right",route:"bus",busRef:"#block-panel",busRefSide:"right",busOffset:18},
+    {from:"#cond-temporal-params",to:"#tm-gate2",kind:"time",fromSide:"right",toSide:"right",route:"bus",busRef:"#block-panel",busRefSide:"right",busOffset:18},
+    {from:"#cond-final-params",to:"#final-expanded-adaln",kind:"time",fromSide:"right",toSide:"top",route:"bus",busRef:"#final-panel",busRefSide:"left",busOffset:-18,label:"Final shift / scale(t)"}
   ];
 
   function anchor(selector, side){
@@ -95,23 +91,25 @@
   }
   function svgElement(tag,attrs){const el=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));return el;}
   function pathFor(a,b,cfg){
-    if(cfg.route==="bus"){const bx=cfg.busX;return `M${a.x},${a.y} H${bx} V${b.y} H${b.x}`;}
+    if(cfg.route==="bus"){const ref=cfg.busRef?anchor(cfg.busRef,cfg.busRefSide||"left"):null;const bx=ref?ref.x+(cfg.busOffset||0):cfg.busX;return `M${a.x},${a.y} H${bx} V${b.y} H${b.x}`;}
     if(cfg.route==="handoffRail"){const rx=Math.min(b.x-10,a.x+(cfg.railGap||18));return `M${a.x},${a.y} H${rx} V${b.y} H${b.x}`;}
     if((cfg.fromSide==="bottom"||cfg.fromSide==="top")&&(cfg.toSide==="top"||cfg.toSide==="bottom")){const my=(a.y+b.y)/2;return `M${a.x},${a.y} C${a.x},${my} ${b.x},${my} ${b.x},${b.y}`;}
     const mx=(a.x+b.x)/2;return `M${a.x},${a.y} C${mx},${a.y} ${mx},${b.y} ${b.x},${b.y}`;
   }
   function drawConnections(){
     connectorGroup.replaceChildren();
+    const renderedPorts=new Set();
     connections.forEach(cfg=>{
       const a=anchor(cfg.from,cfg.fromSide||"right"),b=anchor(cfg.to,cfg.toSide||"left");if(!a||!b)return;
       const kindClass=cfg.kind==="main"?"main-wire":cfg.kind==="zoom"?"zoom-wire":cfg.kind==="action"?"action-wire":cfg.kind==="handoff"?"handoff-wire":"time-wire";
       const path=svgElement("path",{d:pathFor(a,b,cfg),class:kindClass,"data-from":cfg.from,"data-to":cfg.to});
       const startRadius=cfg.kind==="handoff"?3:5,endRadius=cfg.kind==="handoff"?4:6;
-      const start=svgElement("circle",{cx:a.x,cy:a.y,r:startRadius,class:`connector-port ${cfg.kind} start-port`});
-      const end=svgElement("circle",{cx:b.x,cy:b.y,r:endRadius,class:`connector-port ${cfg.kind} end-port`});
-      connectorGroup.append(start,end,path);
+      connectorGroup.append(path);
+      const startKey=`${cfg.from}:${cfg.fromSide||"right"}:${cfg.kind}`;
+      const endKey=`${cfg.to}:${cfg.toSide||"left"}:${cfg.kind}`;
+      if(!renderedPorts.has(startKey)){connectorGroup.append(svgElement("circle",{cx:a.x,cy:a.y,r:startRadius,class:`connector-port ${cfg.kind} start-port`}));renderedPorts.add(startKey);}
+      if(!renderedPorts.has(endKey)){connectorGroup.append(svgElement("circle",{cx:b.x,cy:b.y,r:endRadius,class:`connector-port ${cfg.kind} end-port`}));renderedPorts.add(endKey);}
       if(cfg.label){
-        connectorGroup.append(path);
         const point=path.getPointAtLength(path.getTotalLength()*(cfg.labelAt||.5));
         const text=svgElement("text",{x:point.x+(cfg.labelDx||0),y:point.y-7+(cfg.labelDy||0),class:`connector-label ${cfg.kind}`});
         text.textContent=cfg.label;connectorGroup.append(text);
@@ -121,7 +119,7 @@
 
   function render(){ canvas.style.transform=`translate(${state.x}px,${state.y}px) scale(${state.scale})`; zoomValue.textContent=Math.round(state.scale*100)+"%"; applySemanticZoom(); }
   function applySemanticZoom(){const level=state.scale<.45?"overview":state.scale<.75?"structure":"detail";canvas.classList.remove("semantic-overview","semantic-structure","semantic-detail");canvas.classList.add("semantic-"+level);semanticLevelEl.textContent={overview:"总览层级",structure:"结构层级",detail:"计算层级"}[level];}
-  function setDensity(density){state.density=density;canvas.classList.remove("density-learn","density-structure","density-source");canvas.classList.add("density-"+density);densityButtons.forEach(button=>{const active=button.dataset.density===density;button.classList.toggle("is-active",active);button.setAttribute("aria-pressed",String(active));});}
+  function setDensity(density){state.density=density;canvas.classList.remove("density-learn","density-structure","density-source");canvas.classList.add("density-"+density);densityButtons.forEach(button=>{const active=button.dataset.density===density;button.classList.toggle("is-active",active);button.setAttribute("aria-pressed",String(active));});requestAnimationFrame(drawConnections);}
   function clamp(){ const w=viewport.clientWidth,h=viewport.clientHeight,m=70,sw=CW*state.scale,sh=CH*state.scale; state.x=sw<w?(w-sw)/2:Math.min(m,Math.max(w-sw-m,state.x)); state.y=sh<h?(h-sh)/2:Math.min(m,Math.max(h-sh-m,state.y)); }
   function fit(){ const sx=(viewport.clientWidth-30)/CW,sy=(viewport.clientHeight-30)/CH; state.scale=Math.max(.1,Math.min(.9,Math.min(sx,sy))); state.x=(viewport.clientWidth-CW*state.scale)/2; state.y=(viewport.clientHeight-CH*state.scale)/2; render(); }
   function zoom(next,cx=viewport.clientWidth/2,cy=viewport.clientHeight/2){ const old=state.scale; next=Math.max(.1,Math.min(1.35,next)); const px=(cx-state.x)/old,py=(cy-state.y)/old; state.scale=next; state.x=cx-px*next;state.y=cy-py*next;clamp();render(); }
@@ -175,6 +173,7 @@
   const modes={spatial:{input:"[B·T,S,1152]",q:"[B·T,16,S,72]",k:"[B·T,16,S,72]",v:"[B·T,16,S,72]",score:"[B·T,16,S,S]",weighted:"[B·T,16,S,72]",output:"[B·T,S,1152]",rope:"Spatial：无 RoPE",mask:"OFF",causal:false},temporal:{input:"[B·S,T,1152]",q:"[B·S,16,T,72]",k:"[B·S,16,T,72]",v:"[B·S,16,T,72]",score:"[B·S,16,T,T]",weighted:"[B·S,16,T,72]",output:"[B·S,T,1152]",rope:"Temporal：Q/K 使用 RoPE",mask:"下三角 ON",causal:true}};
   function setMode(key){const m=modes[key];document.getElementById("attn-input").textContent=m.input;document.getElementById("q-shape").textContent=m.q;document.getElementById("k-shape").textContent=m.k;document.getElementById("v-shape").textContent=m.v;document.getElementById("score-shape").textContent=m.score;document.getElementById("weighted-shape").textContent=m.weighted;document.getElementById("attn-output").textContent=m.output;document.getElementById("rope-state").textContent=m.rope;document.querySelector("#causal-mask code").textContent=m.mask;document.getElementById("causal-mask").classList.toggle("is-off",!m.causal);document.querySelectorAll("[data-attention]").forEach(b=>{const on=b.dataset.attention===key;b.classList.toggle("is-active",on);b.setAttribute("aria-pressed",String(on))})}
   document.querySelectorAll("[data-attention]").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.attention)));
+  if("ResizeObserver" in window){const connectorResizeObserver=new ResizeObserver(()=>requestAnimationFrame(drawConnections));const selectors=new Set(connections.flatMap(item=>[item.from,item.to,item.busRef].filter(Boolean)));selectors.forEach(selector=>{const element=document.querySelector(selector);if(element)connectorResizeObserver.observe(element);});}
   setFocusMode(null);setDensity("learn");showDetail("latent");setInspectorOpen(false);setMode("spatial");requestAnimationFrame(()=>{fit();drawConnections();});
   if(document.fonts?.ready)document.fonts.ready.then(drawConnections);
 })();

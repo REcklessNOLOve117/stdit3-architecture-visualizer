@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>WMPO 三模型闭环系统</title>
+  <link rel="stylesheet" href="assets/system-loop.css">
+  <link rel="stylesheet" href="assets/preferences.css">
+</head>
+<body>
+  <a class="skip-link" href="#system-loop">跳到三模型闭环</a>
+
+  <header class="system-header">
+    <nav class="header-links" aria-label="学习页面导航">
+      <a href="index.html">← 八步教学</a>
+      <a href="overview.html">STDiT3 架构地图</a>
+      <a href="end-to-end.html">World Model 内部精细图 →</a>
+    </nav>
+    <div class="header-copy">
+      <div>
+        <p class="eyebrow">WMPO · SYSTEM-LEVEL CLOSED LOOP</p>
+        <h1>三个模型如何构成一个闭环</h1>
+        <p class="subtitle">VLA Policy 决定动作，World Model 模拟动作后果，Reward Model 判断轨迹是否成功；奖励再通过 GRPO 更新 Policy。</p>
+      </div>
+      <div class="system-badge" aria-label="系统包含三个模型">
+        <span>3 MODELS</span>
+        <strong>Policy · World · Reward</strong>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="system-loop" class="loop-section" aria-labelledby="loop-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">ONE TRAJECTORY · ONE CLOSED LOOP</p>
+          <h2 id="loop-title">一次 imagined rollout 的完整数据流</h2>
+        </div>
+        <p>选择阶段，观察三个模型在这一阶段分别读取什么、输出什么，以及谁被更新。</p>
+      </div>
+
+      <div class="phase-controls" role="group" aria-label="闭环阶段">
+        <button type="button" class="phase-button is-active" data-phase="all" aria-pressed="true"><span>00</span>完整闭环</button>
+        <button type="button" class="phase-button" data-phase="act" aria-pressed="false"><span>01</span>Policy 出动作</button>
+        <button type="button" class="phase-button" data-phase="imagine" aria-pressed="false"><span>02</span>World 生成未来</button>
+        <button type="button" class="phase-button" data-phase="score" aria-pressed="false"><span>03</span>Reward 评分</button>
+        <button type="button" class="phase-button" data-phase="update" aria-pressed="false"><span>04</span>GRPO 更新</button>
+        <button type="button" class="phase-button" data-phase="align" aria-pressed="false"><span>05</span>行为对齐</button>
+      </div>
+
+      <div class="loop-layout">
+        <div class="diagram-shell">
+          <svg id="loop-diagram" viewBox="0 0 1200 720" role="img" aria-labelledby="diagram-title diagram-desc">
+            <title id="diagram-title">WMPO 的 VLA Policy、World Model、Reward Model 三模型闭环</title>
+            <desc id="diagram-desc">VLA 根据图像和语言生成动作；World Model 根据历史帧和动作生成未来帧；Reward Model 评估完整 imagined trajectory；奖励经 GRPO 更新 VLA。Policy 的真实行为数据还可用于对齐 World Model。</desc>
+            <defs>
+              <marker id="arrow-policy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+              <marker id="arrow-world" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+              <marker id="arrow-reward" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+              <marker id="arrow-align" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10Z"></path></marker>
+            </defs>
+
+            <g class="input-group diagram-part" data-part="policy act imagine">
+              <rect x="25" y="205" width="150" height="120" rx="12"></rect>
+              <text x="100" y="237" class="input-title">真实初始状态</text>
+              <text x="100" y="264">最近 m 帧</text>
+              <text x="100" y="289">I<tspan baseline-shift="sub">i−m:i</tspan></text>
+              <text x="100" y="312">＋ language g</text>
+              <path d="M175 265H230" class="input-arrow"></path>
+            </g>
+
+            <g class="model-node policy-node diagram-part" data-part="policy act update align">
+              <rect x="230" y="165" width="300" height="200" rx="18"></rect>
+              <text x="260" y="205" class="model-index">MODEL 1</text>
+              <text x="260" y="246" class="model-title">VLA Policy π<tspan baseline-shift="sub">θ</tspan></text>
+              <text x="260" y="278" class="model-role">看当前状态，决定接下来怎么做</text>
+              <line x1="260" y1="298" x2="500" y2="298"></line>
+              <text x="260" y="326" class="io-label">INPUT</text>
+              <text x="326" y="326">frames ＋ instruction</text>
+              <text x="260" y="351" class="io-label">OUTPUT</text>
+              <text x="326" y="351">action chunk a<tspan baseline-shift="sub">i:i+K</tspan></text>
+            </g>
+
+            <g class="model-node world-node diagram-part" data-part="world act imagine align score">
+              <rect x="690" y="165" width="350" height="200" rx="18"></rect>
+              <text x="720" y="205" class="model-index">MODEL 2 · STDiT3</text>
+              <text x="720" y="246" class="model-title">World Model p<tspan baseline-shift="sub">φ</tspan></text>
+              <text x="720" y="278" class="model-role">预测执行动作之后会看到什么</text>
+              <line x1="720" y1="298" x2="1010" y2="298"></line>
+              <text x="720" y="326" class="io-label">INPUT</text>
+              <text x="786" y="326">history frames ＋ actions</text>
+              <text x="720" y="351" class="io-label">OUTPUT</text>
+              <text x="786" y="351">future frames Î<tspan baseline-shift="sub">i:i+K</tspan></text>
+            </g>
+
+            <g class="model-node reward-node diagram-part" data-part="reward score update">
+              <rect x="435" y="500" width="330" height="165" rx="18"></rect>
+              <text x="465" y="540" class="model-index">MODEL 3 · VideoMAE</text>
+              <text x="465" y="581" class="model-title">Reward Model R<tspan baseline-shift="sub">ψ</tspan></text>
+              <text x="465" y="613" class="model-role">判断完整轨迹是否完成任务</text>
+              <line x1="465" y1="630" x2="735" y2="630"></line>
+              <text x="465" y="652" class="io-label">OUTPUT</text>
+              <text x="535" y="652">success probability / y∈{0,1}</text>
+            </g>
+
+            <g class="edge policy-action diagram-part" data-part="act imagine">
+              <path d="M530 220H690"></path>
+              <circle cx="610" cy="220" r="18"></circle>
+              <text x="610" y="226" class="step-number">1</text>
+              <text x="610" y="190" class="edge-title">action chunk</text>
+              <text x="610" y="252" class="edge-shape">a<tspan baseline-shift="sub">i:i+K</tspan> · K=8</text>
+            </g>
+
+            <g class="edge world-state diagram-part" data-part="imagine act">
+              <path d="M690 326C630 430 580 430 530 326"></path>
+              <circle cx="610" cy="397" r="18"></circle>
+              <text x="610" y="403" class="step-number">2</text>
+              <text x="610" y="446" class="edge-title">imagined future frames</text>
+              <text x="610" y="468" class="edge-shape">下一轮作为 Policy 的 observation</text>
+            </g>
+
+            <g class="edge trajectory-edge diagram-part" data-part="score imagine">
+              <path d="M850 365C850 430 790 480 720 500"></path>
+              <circle cx="817" cy="438" r="18"></circle>
+              <text x="817" y="444" class="step-number">3</text>
+              <text x="913" y="428" class="edge-title">完整 imagined trajectory τ</text>
+              <text x="913" y="451" class="edge-shape">frames ＋ actions</text>
+            </g>
+
+            <g class="edge reward-update diagram-part" data-part="update score">
+              <path d="M480 500C355 465 330 415 350 365"></path>
+              <circle cx="372" cy="445" r="18"></circle>
+              <text x="372" y="451" class="step-number">4</text>
+              <text x="268" y="421" class="edge-title">reward → advantage</text>
+              <text x="268" y="444" class="edge-shape">GRPO 更新 θ</text>
+            </g>
+
+            <g class="edge alignment-edge diagram-part" data-part="align">
+              <path d="M360 165C410 65 850 65 900 165"></path>
+              <circle cx="630" cy="91" r="18"></circle>
+              <text x="630" y="97" class="step-number">5</text>
+              <text x="630" y="42" class="edge-title">Policy Behavior Alignment</text>
+              <text x="630" y="65" class="edge-shape">真实 policy rollout → 微调 World Model φ</text>
+            </g>
+
+            <g class="rollout-note diagram-part" data-part="act imagine score">
+              <rect x="1060" y="190" width="115" height="150" rx="12"></rect>
+              <text x="1118" y="222">重复交替</text>
+              <text x="1118" y="254" class="repeat-mark">Policy</text>
+              <text x="1118" y="282">⇄</text>
+              <text x="1118" y="310" class="repeat-mark">World</text>
+              <text x="1118" y="332">直到完整 trial</text>
+            </g>
+          </svg>
+
+          <div class="mobile-loop" aria-label="移动端闭环摘要">
+            <div><b>1 · VLA Policy</b><span>frames + instruction → action chunk</span></div>
+            <i>↓ action</i>
+            <div><b>2 · World Model</b><span>history + action → imagined future frames</span></div>
+            <i>↩ imagined frames 回到 Policy，反复生成完整轨迹</i>
+            <div><b>3 · Reward Model</b><span>imagined trajectory → success reward</span></div>
+            <i>↓ GRPO advantage</i>
+            <div><b>4 · 更新 Policy</b><span>优化 θ；World / Reward 在这一阶段作为环境与评估器</span></div>
+          </div>
+
+          <div class="diagram-legend" aria-label="连线图例">
+            <span><i class="legend-line rollout"></i>rollout 数据</span>
+            <span><i class="legend-line optimization"></i>优化 Policy</span>
+            <span><i class="legend-line alignment"></i>对齐 World Model</span>
+          </div>
+        </div>
+
+        <aside class="phase-detail" aria-live="polite">
+          <p id="phase-kind">COMPLETE SYSTEM</p>
+          <h3 id="phase-title">三个模型各司其职，形成可训练的 imagined environment</h3>
+          <p id="phase-description">Policy 与 World Model 交替生成完整 imagined trajectory；Reward Model 给出任务结果；GRPO 使用组内相对奖励更新 Policy。</p>
+          <dl>
+            <div><dt>传递的数据</dt><dd id="phase-data">frames → actions → future frames → trajectory → reward</dd></div>
+            <div><dt>本阶段更新</dt><dd id="phase-update">Policy θ；行为对齐阶段单独更新 World Model φ</dd></div>
+            <div><dt>保持冻结</dt><dd id="phase-frozen">在 Policy GRPO 阶段：World Model φ 与 Reward Model ψ</dd></div>
+          </dl>
+          <code id="phase-formula">aₜ ~ πθ(a|s)　·　ŝₜ₊₁ ~ pφ(s'|s,a)　·　r = Rψ(τ)</code>
+        </aside>
+      </div>
+    </section>
+
+    <section class="roles-section" aria-labelledby="roles-title">
+      <div class="section-heading compact">
+        <div><p class="section-kicker">RESPONSIBILITY BOUNDARY</p><h2 id="roles-title">三个模型分别学什么</h2></div>
+      </div>
+      <div class="role-grid">
+        <article class="role-card policy-card">
+          <span>πθ</span><h3>VLA Policy</h3>
+          <p>学习从视觉状态和语言指令到 action chunk 的映射。它是 GRPO 真正优化的策略。</p>
+          <code>πθ(aₜ | Iₜ₋ₘ:ₜ, g)</code>
+        </article>
+        <article class="role-card world-card">
+          <span>pφ</span><h3>World Model</h3>
+          <p>学习环境动力学：给定历史帧与动作，生成下一段未来帧。它为 Policy 提供可反复采样的 imagined environment。</p>
+          <code>pφ(Iₜ:ₜ₊K | Iₜ₋c:ₜ, aₜ:ₜ₊K)</code>
+        </article>
+        <article class="role-card reward-card">
+          <span>Rψ</span><h3>Reward Model</h3>
+          <p>学习从视频轨迹判断任务是否成功，提供稀疏的 outcome reward，而不是生成动作或视频。</p>
+          <code>Rψ(τ) → {0,1}</code>
+        </article>
+      </div>
+    </section>
+
+    <section class="training-section" aria-labelledby="training-title">
+      <div class="section-heading compact">
+        <div><p class="section-kicker">TWO DIFFERENT LOOPS</p><h2 id="training-title">不要混淆两种“更新”</h2></div>
+      </div>
+      <div class="training-grid">
+        <article>
+          <span>主闭环 · Policy optimization</span>
+          <h3>World / Reward 作为环境，更新 Policy θ</h3>
+          <p>同一初始状态采样一组 imagined trajectories，Reward Model 打分，GRPO 计算组内相对 advantage，再更新 VLA Policy。</p>
+          <strong>更新：θ　·　冻结：φ、ψ</strong>
+        </article>
+        <article>
+          <span>辅助闭环 · Behavior alignment</span>
+          <h3>真实 Policy 行为数据，更新 World Model φ</h3>
+          <p>收集当前 Policy 的真实成功与失败 rollout，用这些分布内行为数据微调 World Model，使其更忠实地模拟 Policy。</p>
+          <strong>更新：φ　·　目的：减少行为分布偏移</strong>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>系统层依据 WMPO 论文第 3.2–3.4 节整理；World Model 内部结构请继续查看 <a href="end-to-end.html">STDiT3 输入到输出精细图</a>。</p>
+  </footer>
+
+  <script src="assets/system-loop.js"></script>
+  <script src="assets/preferences.js"></script>
+</body>
+</html>
