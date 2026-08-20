@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>WMPO Video / Action 时间对齐</title>
+  <link rel="stylesheet" href="assets/time-alignment.css">
+  <link rel="stylesheet" href="assets/preferences.css">
+</head>
+<body>
+  <a class="skip-link" href="#timeline-panel">跳到时间轴</a>
+
+  <header class="alignment-header">
+    <nav class="header-links" aria-label="学习页面导航">
+      <a href="index.html">← 八步教学</a>
+      <a href="system-loop.html">三模型闭环</a>
+      <a href="end-to-end.html">STDiT3 端到端架构 →</a>
+    </nav>
+    <div class="header-copy">
+      <div>
+        <p class="eyebrow">TEMPORAL CONTRACT · RGB → VAE LATENT → ACTION CONDITION</p>
+        <h1>历史 4 帧、8 个 Action、未来 8 帧如何对齐</h1>
+        <p class="subtitle">Action 不属于某一张同下标图片；它描述两张相邻图片之间发生的状态转移。</p>
+      </div>
+      <div class="contract-badge">
+        <span>WM LEARNS</span>
+        <strong>p(I<sub>t+1:t+8</sub> | I<sub>t−3:t</sub>, a<sub>t:t+7</sub>)</strong>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="definition-strip" aria-label="时间对齐定义">
+      <div><span>历史条件</span><strong>I<sub>t−3</sub> … I<sub>t</sub></strong><small>4 个真实 RGB / latent 帧</small></div>
+      <div class="operator">＋</div>
+      <div><span>动作计划</span><strong>a<sub>t</sub> … a<sub>t+7</sub></strong><small>8 个状态转移</small></div>
+      <div class="operator">→</div>
+      <div><span>预测目标</span><strong>Î<sub>t+1</sub> … Î<sub>t+8</sub></strong><small>8 个 future frames</small></div>
+    </section>
+
+    <section class="frequency-lab" aria-labelledby="frequency-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">FREQUENCY LAB</p>
+          <h2 id="frequency-title">先定义 Hz，再谈 frame / action 对齐</h2>
+        </div>
+        <p>相机每秒产生 <b>f<sub>v</sub></b> 帧；控制器每秒产生 <b>f<sub>a</sub></b> 个原始指令。STDiT3 最终仍需要每个未来帧区间对应一个有效 action 表示。</p>
+      </div>
+
+      <div class="controls-row">
+        <div class="preset-group" role="group" aria-label="频率示例">
+          <button type="button" class="preset-button is-active" data-video-hz="30" data-action-hz="30" aria-pressed="true">30 Hz / 30 Hz</button>
+          <button type="button" class="preset-button" data-video-hz="30" data-action-hz="60" aria-pressed="false">控制更快 · 30 / 60</button>
+          <button type="button" class="preset-button" data-video-hz="30" data-action-hz="10" aria-pressed="false">控制更慢 · 30 / 10</button>
+        </div>
+        <label>视频频率
+          <select id="video-hz">
+            <option value="10">10 Hz</option><option value="15">15 Hz</option><option value="20">20 Hz</option><option value="30" selected>30 Hz</option><option value="60">60 Hz</option>
+          </select>
+        </label>
+        <label>控制频率
+          <select id="action-hz">
+            <option value="5">5 Hz</option><option value="10">10 Hz</option><option value="15">15 Hz</option><option value="20">20 Hz</option><option value="30" selected>30 Hz</option><option value="60">60 Hz</option><option value="90">90 Hz</option><option value="120">120 Hz</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="frequency-readout" aria-live="polite">
+        <div><span>视频帧间隔 Δt<sub>v</sub></span><strong id="video-period">33.3 ms</strong></div>
+        <div><span>控制周期 Δt<sub>a</sub></span><strong id="action-period">33.3 ms</strong></div>
+        <div><span>8 帧预测跨度</span><strong id="horizon-duration">266.7 ms</strong></div>
+        <div><span>跨度内原始控制周期</span><strong id="raw-action-count">约 8 个</strong></div>
+      </div>
+      <p id="frequency-verdict" class="frequency-verdict" aria-live="polite"></p>
+    </section>
+
+    <section id="timeline-panel" class="timeline-section" aria-labelledby="timeline-title">
+      <div class="section-heading compact">
+        <div>
+          <p class="section-kicker">ONE SHARED TIME AXIS</p>
+          <h2 id="timeline-title">RGB、物理动作、VAE latent 与 STDiT condition 共用同一条时间轴</h2>
+        </div>
+        <p>点击任意 action，查看它从“物理执行区间”到“未来 latent 条件位置”的准确路由。</p>
+      </div>
+
+      <div class="action-selector" role="group" aria-label="选择要追踪的 action">
+        <span>追踪：</span>
+        <button type="button" class="action-button is-active" data-action-index="0" aria-pressed="true">a<sub>t</sub></button>
+        <button type="button" class="action-button" data-action-index="1" aria-pressed="false">a<sub>t+1</sub></button>
+        <button type="button" class="action-button" data-action-index="2" aria-pressed="false">a<sub>t+2</sub></button>
+        <button type="button" class="action-button" data-action-index="3" aria-pressed="false">a<sub>t+3</sub></button>
+        <button type="button" class="action-button" data-action-index="4" aria-pressed="false">a<sub>t+4</sub></button>
+        <button type="button" class="action-button" data-action-index="5" aria-pressed="false">a<sub>t+5</sub></button>
+        <button type="button" class="action-button" data-action-index="6" aria-pressed="false">a<sub>t+6</sub></button>
+        <button type="button" class="action-button" data-action-index="7" aria-pressed="false">a<sub>t+7</sub></button>
+      </div>
+
+      <div class="timeline-scroll">
+        <svg id="alignment-timeline" viewBox="0 0 1480 720" role="img" aria-labelledby="svg-title svg-desc">
+          <title id="svg-title">WMPO 历史帧、动作、未来帧和 VAE latent 时间对齐图</title>
+          <desc id="svg-desc">四个历史帧位于锚点 t 之前；八个动作分别作用于相邻帧之间，并生成八个未来帧；逐帧 VAE 保留相同时间位置；STDiT 前四个 action 条件为 NONE，后八个条件对应八个未来 latent。</desc>
+        </svg>
+      </div>
+
+      <div id="selected-relation" class="selected-relation" aria-live="polite">
+        <div><span>执行区间</span><strong>a<sub>t</sub> 作用于 [τ<sub>t</sub>, τ<sub>t+1</sub>)</strong></div>
+        <div class="relation-arrow">→</div>
+        <div><span>状态转移</span><strong>I<sub>t</sub> ─a<sub>t</sub>→ I<sub>t+1</sub></strong></div>
+        <div class="relation-arrow">→</div>
+        <div><span>条件落点</span><strong>STDiT position 4 · z<sub>t+1</sub></strong></div>
+      </div>
+    </section>
+
+    <section class="rules-section" aria-labelledby="rules-title">
+      <div class="section-heading compact">
+        <div><p class="section-kicker">ALIGNMENT RULES</p><h2 id="rules-title">频率不同时，先变成 8 个“帧区间 action”</h2></div>
+        <p>不要通过截断或重复数组长度来假装对齐；应根据真实时间戳对每个相机区间做重采样。</p>
+      </div>
+      <div class="rule-grid">
+        <article>
+          <b>f<sub>a</sub> = f<sub>v</sub></b>
+          <h3>一帧区间，一个 action</h3>
+          <p>a<sub>t+k</sub> 直接控制 I<sub>t+k</sub> → I<sub>t+k+1</sub>，是当前 STDiT 输入最简单的情况。</p>
+        </article>
+        <article>
+          <b>f<sub>a</sub> &gt; f<sub>v</sub></b>
+          <h3>一个帧区间含多个控制指令</h3>
+          <p>按时间戳聚合。速度可做时间加权平均；delta pose 应组合或积分，不能简单取最后一个。</p>
+        </article>
+        <article>
+          <b>f<sub>a</sub> &lt; f<sub>v</sub></b>
+          <h3>一个控制指令跨多个帧区间</h3>
+          <p>按控制器的保持规则执行 zero-order hold，并把同一指令投影到它覆盖的每个帧区间。</p>
+        </article>
+      </div>
+      <div class="equation-row">
+        <code>frame interval k = [τ<sub>t+k</sub>, τ<sub>t+k+1</sub>)</code>
+        <code>ā<sub>k</sub> = Align({u(s) | s 位于 interval k})</code>
+        <code>WM input actions = [ā<sub>0</sub>, …, ā<sub>7</sub>]</code>
+      </div>
+    </section>
+
+    <section class="code-contract" aria-labelledby="contract-title">
+      <div>
+        <p class="section-kicker">CURRENT WMPO CONTRACT</p>
+        <h2 id="contract-title">代码定义了索引窗口，但真实 Hz 仍必须由数据采集协议确认</h2>
+      </div>
+      <div class="contract-grid">
+        <div><span>Video slice</span><code>start−3 : start+9</code><p>I<sub>t−3</sub> … I<sub>t+8</sub>，共 12 帧</p></div>
+        <div><span>Action slice</span><code>start : start+8</code><p>a<sub>t</sub> … a<sub>t+7</sub>，共 8 个动作</p></div>
+        <div><span>2D VAE</span><code>patch_size_time = 1</code><p>RGB frame 与 latent frame 一一对应</p></div>
+        <div class="warning"><span>必须补充</span><code>RGB timestamp + action start/end timestamp</code><p>仅写 <code>fps=30</code> 不能证明传感器与控制器已同步。</p></div>
+        <div class="warning"><span>当前 rollout 首步</span><code>z_t × 4</code><p>现有实现把单张初始观测复制成 4 个历史 latent；后续窗口才使用最近 4 个生成 latent。它与“始终输入 4 个真实历史帧”不是同一件事。</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>核心约定：<b>a<sub>t+k</sub> 对应的是 I<sub>t+k</sub> → I<sub>t+k+1</sub> 的转移</b>；进入 STDiT 时，它被放到目标 future latent z<sub>t+k+1</sub> 的条件位置。</p>
+  </footer>
+
+  <script src="assets/time-alignment.js"></script>
+  <script src="assets/preferences.js"></script>
+</body>
+</html>
