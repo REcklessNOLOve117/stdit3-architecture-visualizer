@@ -601,13 +601,100 @@
   });
   svg.appendChild(defs);
 
+  const overviewLayer = make("g", { class: "overview-layer" });
+  const overviewEdgeLayer = make("g", { class: "overview-edge-layer" });
+  const overviewNodeLayer = make("g", { class: "overview-node-layer" });
+  const overviewLabelLayer = make("g", { class: "overview-label-layer" });
+  const overviewPortLayer = make("g", { class: "overview-port-layer" });
+  overviewLayer.append(overviewEdgeLayer, overviewNodeLayer, overviewLabelLayer, overviewPortLayer);
+
   const panelLayer = make("g", { class: "panel-layer" });
   const edgeLayer = make("g", { class: "edge-layer" });
   const nodeLayer = make("g", { class: "node-layer" });
   const labelLayer = make("g", { class: "label-layer" });
   const portLayer = make("g", { class: "port-layer" });
   const annotationLayer = make("g", { class: "annotation-layer" });
-  svg.append(panelLayer, edgeLayer, nodeLayer, labelLayer, portLayer, annotationLayer);
+  svg.append(overviewLayer, panelLayer, edgeLayer, nodeLayer, labelLayer, portLayer, annotationLayer);
+
+  overviewLayer.insertBefore(make("rect", { x: 40, y: 45, width: 2620, height: 1545, rx: 30, class: "overview-backdrop" }), overviewEdgeLayer);
+  overviewLayer.insertBefore(make("text", { x: 90, y: 115, class: "overview-heading" }, "一次看清：输入 → 30步采样 → STDiT3 → 8帧未来视频"), overviewEdgeLayer);
+  overviewLayer.insertBefore(make("text", { x: 90, y: 157, class: "overview-subtitle" }, "点击模块查看公式；点击聚焦按钮进入对应的算子级计算图。"), overviewEdgeLayer);
+  overviewLayer.insertBefore(make("text", { x: 90, y: 220, class: "overview-lane-label" }, "VIDEO / HIDDEN 主数据流"), overviewEdgeLayer);
+  overviewLayer.insertBefore(make("text", { x: 90, y: 845, class: "overview-lane-label" }, "CONDITION 条件支路"), overviewEdgeLayer);
+
+  const overviewNodes = [
+    { id: "overview-input", target: "historyQueue", x: 90, y: 260, w: 460, h: 160, kind: "video", step: "01 · ROLLOUT", title: "History + future noise", concrete: "[1,4,4,32²] + [1,4,8,32²]", symbolic: "[B,Cz,Tₕ,32²] + [B,Cz,Tf,32²]", note: "首轮单帧latent repeat×4", paths: ["video"] },
+    { id: "overview-concat", target: "concatOnce", x: 650, y: 260, w: 400, h: 160, kind: "video", step: "02 · ONCE", title: "concat 一次", concrete: "[1,4,12,32,32]", symbolic: "[B,Cz,T,h,w]", note: "循环内不重新concat", paths: ["video"] },
+    { id: "overview-rflow", target: "zCurrent", x: 1150, y: 260, w: 420, h: 160, kind: "video", step: "03 · RFLOW ×30", title: "z_current", concrete: "[1,4,12,32,32]", symbolic: "[B,Cz,T,h,w]", note: "4槽固定 · 8槽迭代更新", paths: ["video", "time", "mask"] },
+    { id: "overview-video", target: "tokenGrid", x: 1670, y: 260, w: 490, h: 160, kind: "video", step: "04 · STDiT INPUT", title: "Video patch tokens", concrete: "[1,12,256,1152]", symbolic: "[B,T,S,H]", note: "PatchEmbed3D + 2D position", paths: ["video"] },
+    { id: "overview-pair", target: "spInput", x: 90, y: 570, w: 620, h: 180, kind: "video", step: "05 · EXPANDED PAIR #1", title: "Spatial → Temporal", concrete: "Action-AdaLN → x₂ → causal time", symbolic: "Spatial(cₛ) → Temporal(cₜ)", note: "Action只直连Spatial；Temporal接收x₂", paths: ["video", "action", "time", "mask"] },
+    { id: "overview-backbone", target: "remainingPairs", x: 820, y: 580, w: 440, h: 160, kind: "video", step: "06 · BACKBONE", title: "同构 Pair ×28", concrete: "[1,12,256,1152]", symbolic: "[B,T,S,H]", note: "只精细展开其中1个", paths: ["video", "action", "time", "mask"] },
+    { id: "overview-final", target: "rflowUpdate", x: 1370, y: 570, w: 600, h: 180, kind: "video", step: "07 · PREDICT + UPDATE", title: "Final → flow → update", concrete: "8ch → first 4ch → z + v·dt", symbolic: "2Cz → Cz → zₖ₊₁", note: "随后restore前4个condition slots", paths: ["video", "time", "mask"] },
+    { id: "overview-output", target: "futureRgb", x: 2080, y: 580, w: 490, h: 160, kind: "output", step: "AFTER STEP 30", title: "VAE Decoder → 8 RGB", concrete: "[1,8,256,256,3]", symbolic: "[B,Tf,Himg,Wimg,3]", note: "只解码最后8个future slots", paths: ["video"] },
+    { id: "overview-action", target: "actionChunk", x: 90, y: 890, w: 400, h: 150, kind: "action", step: "ACTION INPUT", title: "8 × 7D actions", concrete: "[1,8,7]", symbolic: "[B,Ta,Da]", note: "Policy action chunk", paths: ["action"] },
+    { id: "overview-action-condition", target: "spatialChunk", x: 590, y: 880, w: 580, h: 170, kind: "action", step: "ACTION CONDITION", title: "ActionEncoder → Spatial 6H", concrete: "[1,12,6,1152] → chunk(6)", symbolic: "[B,T,6,H] → 6×[B,T,1,H]", note: "参数进入Spatial两处AdaLN和gate", paths: ["action", "time"] },
+    { id: "overview-time", target: "timestepTransform", x: 90, y: 1160, w: 400, h: 150, kind: "time", step: "DIFFUSION TIME", title: "timestep transform", concrete: "[1] → Eₜ [1,1152]", symbolic: "[B] → Eₜ [B,H]", note: "Spatial + Temporal + Final共享", paths: ["time"] },
+    { id: "overview-mask", target: "maskMeaning", x: 590, y: 1150, w: 580, h: 170, kind: "mask", step: "CONDITION SELECTOR", title: "x_mask + t₀=15", concrete: "[0×4 | 1×8] → torch.where", symbolic: "[history False | future True]", note: "选择modulation；不是Attention Mask", paths: ["mask"] },
+    { id: "overview-cfg", target: "cfgGhost", x: 2070, y: 1030, w: 500, h: 170, kind: "disabled", step: "NOT EXECUTED", title: "CFG scale = 7", concrete: "当前主链：v_pred = pred", symbolic: "no active CFG tensor", note: "cond/uncond组合代码被注释", paths: [] },
+  ];
+
+  const overviewNodeById = new Map(overviewNodes.map((node) => [node.id, node]));
+  const overviewShapeTextElements = new Map();
+  const overviewNodeElements = new Map();
+  const renderOverviewNode = (node) => {
+    const group = make("g", { id: node.id, class: `overview-node kind-${node.kind}`, tabindex: "0", role: "button", "aria-label": `${node.title}，${node.concrete}`, "data-target": node.target, "data-paths": node.paths.join(" ") });
+    group.appendChild(make("rect", { x: node.x, y: node.y, width: node.w, height: node.h, rx: 18 }));
+    group.appendChild(make("text", { x: node.x + 18, y: node.y + 28, class: "overview-step" }, node.step));
+    group.appendChild(make("text", { x: node.x + 18, y: node.y + 63, class: "overview-title" }, node.title));
+    const shapeText = make("text", { x: node.x + 18, y: node.y + 96, class: "overview-shape" }, node.concrete);
+    group.appendChild(shapeText);
+    group.appendChild(make("text", { x: node.x + 18, y: node.y + node.h - 18, class: "overview-note" }, node.note));
+    group.addEventListener("click", () => selectNode(node.target));
+    group.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(node.target); }
+    });
+    overviewNodeLayer.appendChild(group);
+    overviewShapeTextElements.set(node.id, shapeText);
+    overviewNodeElements.set(node.id, group);
+  };
+  overviewNodes.forEach(renderOverviewNode);
+
+  const overviewEdges = [
+    { id: "overview-edge-input-concat", from: "overview-input", to: "overview-concat", type: "video", paths: ["video"] },
+    { id: "overview-edge-concat-rflow", from: "overview-concat", to: "overview-rflow", type: "video", paths: ["video"] },
+    { id: "overview-edge-rflow-video", from: "overview-rflow", to: "overview-video", type: "video", paths: ["video"] },
+    { id: "overview-edge-video-pair", from: "overview-video", to: "overview-pair", type: "video", fromSide: "bottom", toSide: "top", fromRatio: .72, toRatio: .5, via: [[2023, 505], [400, 505]], label: "STDiT3 forward", labelAt: [1210, 488], paths: ["video"] },
+    { id: "overview-edge-pair-backbone", from: "overview-pair", to: "overview-backbone", type: "video", paths: ["video"] },
+    { id: "overview-edge-backbone-final", from: "overview-backbone", to: "overview-final", type: "video", paths: ["video"] },
+    { id: "overview-edge-final-output", from: "overview-final", to: "overview-output", type: "video", paths: ["video"] },
+    { id: "overview-edge-action-build", from: "overview-action", to: "overview-action-condition", type: "action", paths: ["action"] },
+    { id: "overview-edge-action-pair", from: "overview-action-condition", to: "overview-pair", type: "action", fromSide: "top", toSide: "bottom", fromRatio: .35, toRatio: .28, via: [[793, 815], [264, 815]], paths: ["action"] },
+    { id: "overview-edge-time-pair", from: "overview-time", to: "overview-pair", type: "time", fromSide: "right", toSide: "bottom", toRatio: .52, via: [[540, 1235], [540, 800], [412, 800]], paths: ["time"] },
+    { id: "overview-edge-mask-pair", from: "overview-mask", to: "overview-pair", type: "mask", fromSide: "top", toSide: "bottom", fromRatio: .3, toRatio: .78, via: [[764, 790], [574, 790]], paths: ["mask"] },
+    { id: "overview-edge-mask-final", from: "overview-mask", to: "overview-final", type: "mask", fromSide: "right", toSide: "bottom", toRatio: .22, via: [[1250, 1235], [1250, 810], [1502, 810]], paths: ["mask"] },
+    { id: "overview-edge-loop", from: "overview-final", to: "overview-rflow", type: "loop", fromSide: "bottom", toSide: "bottom", fromRatio: .72, toRatio: .5, via: [[1802, 1480], [1360, 1480]], label: "restore history → 完整12槽进入 step k+1 · 共30步", labelAt: [1580, 1455], paths: ["video", "time", "mask"] },
+  ];
+
+  const overviewPoint = (node, side = "right", ratio = .5) => {
+    if (side === "left") return [node.x, node.y + node.h * ratio];
+    if (side === "right") return [node.x + node.w, node.y + node.h * ratio];
+    if (side === "top") return [node.x + node.w * ratio, node.y];
+    return [node.x + node.w * ratio, node.y + node.h];
+  };
+  const overviewEdgeElements = new Map();
+  overviewEdges.forEach((edge) => {
+    const fromNode = overviewNodeById.get(edge.from);
+    const toNode = overviewNodeById.get(edge.to);
+    const start = overviewPoint(fromNode, edge.fromSide || "right", edge.fromRatio ?? .5);
+    const end = overviewPoint(toNode, edge.toSide || "left", edge.toRatio ?? .5);
+    const points = [start, ...(edge.via || []), end];
+    const d = points.map((point, index) => `${index ? "L" : "M"} ${point[0]} ${point[1]}`).join(" ");
+    const path = make("path", { id: edge.id, d, class: `overview-edge ${edge.type}`, "data-paths": edge.paths.join(" "), "marker-end": `url(#arrow-${edge.type})`, "vector-effect": "non-scaling-stroke" });
+    overviewEdgeLayer.appendChild(path);
+    overviewEdgeElements.set(edge.id, path);
+    [start, end].forEach((point) => overviewPortLayer.appendChild(make("circle", { cx: point[0], cy: point[1], r: 10, class: `overview-port ${edge.type === "loop" ? "time" : edge.type}`, "data-paths": edge.paths.join(" ") })));
+    if (edge.label) overviewLabelLayer.appendChild(make("text", { x: edge.labelAt[0], y: edge.labelAt[1], class: "overview-edge-label", "data-paths": edge.paths.join(" ") }, edge.label));
+  });
 
   panels.forEach((panel) => {
     const g = make("g", { "data-panel": panel.id });
@@ -733,6 +820,7 @@
   const inspectorDescription = document.getElementById("inspector-description");
   const inspectorFormula = document.getElementById("inspector-formula");
   const inspectorSource = document.getElementById("inspector-source");
+  const graphStage = viewport.closest(".graph-stage");
   let selectedNodeId = null;
 
   const selectNode = (nodeId) => {
@@ -740,6 +828,7 @@
     if (!node) return;
     selectedNodeId = nodeId;
     nodeElements.forEach((element, id) => element.classList.toggle("is-selected", id === nodeId));
+    overviewNodeElements.forEach((element) => element.classList.toggle("is-selected", element.dataset.target === nodeId));
     inspectorKind.textContent = node.kindLabel;
     inspectorTitle.textContent = node.title;
     inspectorInput.textContent = node.input?.[shapeMode] || "—";
@@ -748,15 +837,18 @@
     inspectorFormula.textContent = node.formula;
     inspectorSource.textContent = `源码：${node.source}`;
     inspector.classList.add("is-open");
+    graphStage?.classList.add("has-inspector");
     openInspectorButton.hidden = true;
   };
 
   document.getElementById("close-inspector")?.addEventListener("click", () => {
     inspector.classList.remove("is-open");
+    graphStage?.classList.remove("has-inspector");
     openInspectorButton.hidden = false;
   });
   openInspectorButton?.addEventListener("click", () => {
     inspector.classList.add("is-open");
+    graphStage?.classList.add("has-inspector");
     openInspectorButton.hidden = true;
   });
 
@@ -771,6 +863,10 @@
       nodes.forEach((node) => {
         shapeTextElements.get(node.id).textContent = node.shapes[shapeMode];
         nodeElements.get(node.id).setAttribute("aria-label", `${node.title}，${node.shapes[shapeMode]}`);
+      });
+      overviewNodes.forEach((node) => {
+        overviewShapeTextElements.get(node.id).textContent = node[shapeMode];
+        overviewNodeElements.get(node.id).setAttribute("aria-label", `${node.title}，${node[shapeMode]}`);
       });
       if (selectedNodeId) selectNode(selectedNodeId);
     });
@@ -792,10 +888,18 @@
     });
     labelLayer.querySelectorAll(".edge-label-group").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
     portLayer.querySelectorAll(".port").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
+    overviewNodeElements.forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
+    overviewEdgeElements.forEach((element) => {
+      element.classList.toggle("is-dimmed", !matches(element));
+      element.classList.toggle("is-highlighted", Boolean(activePath && matches(element)));
+    });
+    overviewPortLayer.querySelectorAll(".overview-port").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
+    overviewLabelLayer.querySelectorAll(".overview-edge-label").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
   };
   document.querySelectorAll("[data-path]").forEach((button) => button.addEventListener("click", () => applyPathFocus(button.dataset.path)));
 
   const views = {
+    overview: { x: 0, y: 0, w: 2700, h: 1650 },
     all: { x: 0, y: 0, w: canvas.width, h: canvas.height },
     rollout: { x: 15, y: 35, w: 700, h: 2160 },
     sampler: { x: 690, y: 25, w: 2890, h: 2640 },
@@ -804,7 +908,8 @@
     temporal: { x: 2190, y: 620, w: 780, h: 1530 },
     output: { x: 690, y: 2050, w: 2890, h: 1090 },
   };
-  let view = { ...views.all };
+  let densityMode = "overview";
+  let view = { ...views.overview };
 
   const updateViewBox = () => {
     view.w = Math.max(420, Math.min(canvas.width * 2.3, view.w));
@@ -812,7 +917,8 @@
     view.x = Math.max(-canvas.width * .25, Math.min(canvas.width * 1.25 - view.w, view.x));
     view.y = Math.max(-canvas.height * .25, Math.min(canvas.height * 1.25 - view.h, view.y));
     svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`);
-    const percent = Math.round((canvas.width / view.w) * 100);
+    const baseWidth = densityMode === "overview" ? views.overview.w : canvas.width;
+    const percent = Math.round((baseWidth / view.w) * 100);
     document.getElementById("zoom-value").textContent = `${percent}%`;
   };
 
@@ -824,8 +930,24 @@
   const markActiveFocus = (focusName) => {
     document.querySelectorAll("[data-focus]").forEach((candidate) => candidate.classList.toggle("is-active", candidate.dataset.focus === focusName));
   };
+  const setDensityMode = (mode, resetView = true) => {
+    densityMode = mode;
+    svg.classList.toggle("mode-overview", mode === "overview");
+    svg.classList.toggle("mode-detail", mode === "detail");
+    document.querySelectorAll("[data-density]").forEach((button) => {
+      const active = button.dataset.density === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    if (resetView) {
+      markActiveFocus(null);
+      setView(mode === "overview" ? views.overview : views.all);
+    }
+  };
+  document.querySelectorAll("[data-density]").forEach((button) => button.addEventListener("click", () => setDensityMode(button.dataset.density)));
   document.querySelectorAll("[data-focus]").forEach((button) => {
     button.addEventListener("click", () => {
+      setDensityMode("detail", false);
       markActiveFocus(button.dataset.focus);
       setView(views[button.dataset.focus] || views.all);
     });
@@ -844,7 +966,7 @@
   };
   document.getElementById("zoom-in")?.addEventListener("click", () => zoomAt(.82));
   document.getElementById("zoom-out")?.addEventListener("click", () => zoomAt(1.22));
-  document.getElementById("fit-graph")?.addEventListener("click", () => { markActiveFocus("all"); setView(views.all); });
+  document.getElementById("fit-graph")?.addEventListener("click", () => { markActiveFocus(null); setView(densityMode === "overview" ? views.overview : views.all); });
 
   viewport.addEventListener("wheel", (event) => {
     event.preventDefault();
@@ -853,7 +975,7 @@
 
   let dragState = null;
   viewport.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || event.target.closest?.(".cg-node")) return;
+    if (event.button !== 0 || event.target.closest?.(".cg-node,.overview-node")) return;
     dragState = { x: event.clientX, y: event.clientY, view: { ...view } };
     viewport.classList.add("is-dragging");
     viewport.setPointerCapture(event.pointerId);
@@ -880,7 +1002,7 @@
     } else if (event.key === "-") {
       event.preventDefault(); zoomAt(1.19);
     } else if (event.key === "0") {
-      event.preventDefault(); markActiveFocus("all"); setView(views.all);
+      event.preventDefault(); markActiveFocus(null); setView(densityMode === "overview" ? views.overview : views.all);
     } else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
       event.preventDefault();
       const stepX = view.w * .08;
@@ -893,6 +1015,7 @@
     } else if (event.key === "Escape") {
       applyPathFocus("clear");
       inspector.classList.remove("is-open");
+      graphStage?.classList.remove("has-inspector");
       openInspectorButton.hidden = false;
     }
   });
@@ -917,5 +1040,5 @@
     status.classList.add("is-error");
   }
 
-  updateViewBox();
+  setDensityMode("overview");
 })();

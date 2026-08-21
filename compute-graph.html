@@ -30,12 +30,17 @@
 
   <main class="compute-shell">
     <section class="graph-intro" aria-label="计算图阅读说明">
-      <div><b>当前执行主链</b><span>CFG 配置存在，但当前 RFLOW 组合代码被注释，因此只作为灰色说明。</span></div>
-      <div><b>一层是什么意思</b><span>图中完整展开 1 个 Spatial → Temporal Pair；真实模型顺序执行 28 个 Pair。</span></div>
-      <div><b>箭头如何连接</b><span>每条线均连接独立 tensor/operator port，不以整个 Block 外框作为端点。</span></div>
+      <div><b>先看总览</b><span>默认只保留主数据流和三条条件支路；选择聚焦区域后再展开算子。</span></div>
+      <div><b>一层是什么意思</b><span>只精细展开 1 个 Spatial → Temporal Pair；真实网络顺序执行 28 个 Pair。</span></div>
+      <div><b>当前执行边界</b><span>CFG 仅作灰色说明；主链严格对应当前 RFLOW 执行代码。</span></div>
     </section>
 
     <div class="compute-toolbar" aria-label="计算图工具栏">
+      <div class="tool-group density-tools" role="group" aria-label="信息层级">
+        <span>层级</span>
+        <button type="button" class="is-active" data-density="overview" aria-pressed="true">清晰总览</button>
+        <button type="button" data-density="detail" aria-pressed="false">完整计算</button>
+      </div>
       <div class="tool-group shape-mode" role="group" aria-label="Shape 显示模式">
         <span>Shape</span>
         <button type="button" class="is-active" data-shape-mode="concrete" aria-pressed="true">具体数值</button>
@@ -77,7 +82,7 @@
 
     <section class="graph-stage" aria-label="可拖拽缩放计算图">
       <div id="compute-graph-viewport" class="compute-graph-viewport" tabindex="0" aria-label="WMPO 单层完整计算图，可拖拽、滚轮缩放并点击节点">
-        <svg id="compute-graph" viewBox="0 0 3600 3160" role="img" aria-labelledby="compute-svg-title compute-svg-desc">
+        <svg id="compute-graph" class="mode-overview" viewBox="0 0 2700 1650" role="img" aria-labelledby="compute-svg-title compute-svg-desc">
           <title id="compute-svg-title">WMPO 从历史帧和动作到未来帧的单层完整计算图</title>
           <desc id="compute-svg-desc">图中展示 rollout wrapper、30步 Rectified Flow、ActionEncoder、Action-AdaLN、一个 Spatial 与 Temporal Pair、Final Layer、flow update 和 VAE Decoder 的张量形状。</desc>
         </svg>
