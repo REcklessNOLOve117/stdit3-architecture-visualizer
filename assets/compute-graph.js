@@ -61,14 +61,14 @@
   const io = (concrete, symbolic = concrete) => ({ concrete, symbolic });
 
   const panels = [
-    { id: "rollout", x: 40, y: 60, w: 650, h: 2100, cls: "", label: "OUTSIDE STDiT", title: "Rollout wrapper", note: "首轮单帧编码；后续复用上一 chunk latent；concat 只发生一次" },
-    { id: "sampler", x: 720, y: 60, w: 2840, h: 2580, cls: "sampler", label: "EXECUTED SAMPLER", title: "Rectified Flow sampling loop ×30", note: "每一步更新完整 12-slot latent；同一个 STDiT3 被重复调用" },
-    { id: "model", x: 780, y: 460, w: 2700, h: 1770, cls: "model", label: "ONE STDiT3 FORWARD", title: "STDiT3-XL/2 · 28 Spatial → Temporal Pair", note: "仅展开 Pair #1；蓝色是 hidden 主链，条件参数从独立显式端口进入" },
-    { id: "action", x: 805, y: 665, w: 720, h: 1450, cls: "", label: "CONDITION BRANCH", title: "ActionEncoder + Spatial 6H", note: "Action 不拼接为 token；它只改变 Spatial modulation" },
-    { id: "spatial", x: 1550, y: 665, w: 650, h: 1450, cls: "spatial", label: "PAIR #1 · SPACE", title: "Spatial Transformer Block", note: "每帧内部的 256 个空间 token 做 Self-Attention" },
-    { id: "temporal", x: 2225, y: 665, w: 700, h: 1450, cls: "temporal", label: "PAIR #1 · TIME", title: "Temporal Transformer Block", note: "每个空间位置沿 12 个时间槽做 causal attention + RoPE" },
-    { id: "masklane", x: 2950, y: 560, w: 480, h: 1555, cls: "", label: "ACTIVE SELECTOR", title: "x_mask / t₀=15", note: "它选择 modulation；不是 Attention Mask" },
-    { id: "output", x: 720, y: 2690, w: 2840, h: 410, cls: "", label: "AFTER 30 STEPS", title: "Future latent → VAE Decoder → 8 future RGB", note: "scheduler 返回完整 12 槽，wrapper 先取最后 8 个 temporal slots" },
+    { id: "rollout", x: 40, y: 60, w: 650, h: 2100, cls: "", headerBandX: 40, headerWidth: 650, headerHeight: 104, showNote: true, label: "OUTSIDE STDiT", title: "Rollout wrapper", note: "首轮单帧编码；后续复用上一 chunk latent；concat 只发生一次" },
+    { id: "sampler", x: 720, y: 60, w: 2840, h: 2580, cls: "sampler", headerBandX: 1980, headerWidth: 1000, headerHeight: 70, label: "EXECUTED SAMPLER", title: "Rectified Flow sampling loop ×30", note: "每一步更新完整 12-slot latent；同一个 STDiT3 被重复调用" },
+    { id: "model", x: 780, y: 460, w: 2700, h: 1770, cls: "model", headerBandX: 1745, headerWidth: 1640, headerHeight: 70, label: "ONE STDiT3 FORWARD", title: "STDiT3-XL/2 · 28 Spatial → Temporal Pair", note: "仅展开 Pair #1；蓝色是 hidden 主链，条件参数从独立显式端口进入" },
+    { id: "action", x: 805, y: 665, w: 720, h: 1450, cls: "", headerBandX: 805, headerWidth: 410, headerHeight: 70, label: "CONDITION BRANCH", title: "ActionEncoder + Spatial 6H", note: "Action 不拼接为 token；它只改变 Spatial modulation" },
+    { id: "spatial", x: 1550, y: 665, w: 650, h: 1450, cls: "spatial", headerBandX: 1550, headerWidth: 270, headerHeight: 62, label: "PAIR #1 · SPACE", title: "Spatial Block", note: "每帧内部的 256 个空间 token 做 Self-Attention" },
+    { id: "temporal", x: 2225, y: 665, w: 700, h: 1450, cls: "temporal", headerBandX: 2225, headerWidth: 340, headerHeight: 62, label: "PAIR #1 · TIME", title: "Temporal Block", note: "每个空间位置沿 12 个时间槽做 causal attention + RoPE" },
+    { id: "masklane", x: 2950, y: 560, w: 480, h: 1555, cls: "", headerBandX: 2950, headerWidth: 480, headerHeight: 88, showNote: true, label: "ACTIVE SELECTOR", title: "x_mask / t₀=15", note: "选择 modulation；不是 Attention Mask" },
+    { id: "output", x: 720, y: 2690, w: 2840, h: 410, cls: "", headerBandX: 960, headerWidth: 1380, headerHeight: 50, label: "AFTER 30 STEPS", title: "Future latent → VAE Decoder → 8 future RGB", note: "scheduler 返回完整 12 槽，wrapper 先取最后 8 个 temporal slots" },
   ];
 
   const nodes = [
@@ -195,12 +195,12 @@
       input: io("[8,1152]", "[B·Ta,H]"), description: "恢复 batch 和 action 时间维。每个 action embedding 对应一个未来 temporal slot 的 normal modulation 分支。", formula: "reshape → [B,Ta,H]", source: sources.stdit, paths: ["action"],
     },
     {
-      id: "noneParam", x: 1120, y: 865, w: 250, h: 104, kind: "action", kindLabel: "ONE LEARNED PARAMETER",
+      id: "noneParam", x: 1120, y: 910, w: 250, h: 104, kind: "action", kindLabel: "ONE LEARNED PARAMETER",
       title: "none_action", note: "只有1个可学习向量", shapes: shape("[1,1152]", "[1,H]"),
       input: io("Embedding(1,H).weight"), description: "源码只有一个 learned NONE vector，不是4个互不相同的可学习向量。", formula: "nn.Embedding(1,H)", source: sources.stdit, paths: ["action"],
     },
     {
-      id: "noneRepeat", x: 1120, y: 995, w: 250, h: 104, kind: "action", kindLabel: "TENSOR REPEAT",
+      id: "noneRepeat", x: 1120, y: 1040, w: 250, h: 104, kind: "action", kindLabel: "TENSOR REPEAT",
       title: "repeat NONE ×4", note: "只为补齐时间长度", shapes: shape("[1,4,1152]", "[B,Tₕ,H]"),
       input: io("[1,1152]", "[1,H]"), description: "同一个 NONE embedding 被复制到4个历史槽。masked inference 中这些历史位置最终选择 t0=15 分支，因此不要理解为 NONE 实际调制了历史特征。", formula: "repeat(B, pad_action_num=4, 1)", source: sources.stdit, paths: ["action"],
     },
@@ -481,8 +481,8 @@
     { id: "e-prev-queue", from: "previousLatent", to: "historyQueue", type: "video", fromSide: "bottom", toSide: "right", via: [[515, 590], [515, 672]], label: "后续chunk", labelAt: [530, 598], paths: ["video"] },
     { id: "e-queue-concat", from: "historyQueue", to: "concatOnce", type: "video", fromSide: "bottom", toSide: "top", paths: ["video"] },
     { id: "e-noise-concat", from: "futureNoise", to: "concatOnce", type: "video", fromSide: "bottom", toSide: "right", via: [[515, 915], [550, 1001]], paths: ["video"] },
-    { id: "e-concat-z", from: "concatOnce", to: "zCurrent", type: "video", fromSide: "right", toSide: "left", via: [[620, 1001], [620, 216], [770, 216]], label: "仅一次真实 concat", labelAt: [710, 190], paths: ["video"] },
-    { id: "e-mask-xmask", from: "maskSpec", to: "xMask", type: "mask", fromSide: "right", toSide: "left", via: [[650, 1171], [650, 310], [1600, 310], [1600, 216]], paths: ["mask"] },
+    { id: "e-concat-z", from: "concatOnce", to: "zCurrent", type: "video", fromSide: "right", toSide: "left", via: [[675, 1001], [675, 216], [770, 216]], label: "仅一次真实 concat", labelAt: [590, 190], paths: ["video"] },
+    { id: "e-mask-xmask", from: "maskSpec", to: "xMask", type: "mask", fromSide: "right", toSide: "left", via: [[650, 1171], [650, 420], [1600, 420], [1600, 216]], paths: ["mask"] },
     { id: "e-action-input", from: "actionChunk", to: "actionFlatten", type: "action", fromSide: "right", toSide: "left", via: [[680, 1366], [680, 797], [790, 797]], paths: ["action"] },
 
     // Sampler / model input.
@@ -533,7 +533,7 @@
     { id: "e-sch-x2", from: "spatialChunk", to: "spX2", type: "action", fromSide: "right", fromRatio: .82, toSide: "left", toRatio: .44, via: [[1595, 2075], [1595, 2001], [1800, 2001]], label: "gate_mlp", labelAt: [1705, 1987], paths: ["action"] },
 
     // Explicit x2 handoff and Temporal condition pipeline.
-    { id: "e-x2-tmin", from: "spX2", to: "tmInput", type: "video", fromSide: "right", toSide: "left", via: [[2180, 2008], [2180, 782], [2560, 782]], label: "x₂ 原样传递 · shape不变", labelAt: [2380, 758], paths: ["video"] },
+    { id: "e-x2-tmin", from: "spX2", to: "tmInput", type: "video", fromSide: "right", toSide: "left", via: [[2180, 2008], [2180, 850], [2570, 850], [2570, 782]], label: "x₂ 原样传递 · shape不变", labelAt: [2380, 834], paths: ["video"] },
     { id: "e-tembed-tblockt", from: "tEmbed", to: "tBlockTemporal", type: "time", fromSide: "right", toSide: "left", via: [[1530, 712], [2205, 712], [2205, 777]], label: "Temporal 无直接action", labelAt: [1950, 694], paths: ["time"] },
     { id: "e-tbt-six", from: "tBlockTemporal", to: "temporalSixH", type: "time", fromSide: "bottom", toSide: "top", paths: ["time"] },
     { id: "e-tsix-pack", from: "temporalSixH", to: "temporalPack", type: "time", fromSide: "bottom", toSide: "top", paths: ["time"] },
@@ -585,7 +585,7 @@
     { id: "e-update-restore", from: "rflowUpdate", to: "restoreCondition", type: "video", fromSide: "left", toSide: "right", paths: ["video"] },
     { id: "e-z-restore", from: "zCurrent", to: "restoreCondition", type: "video", fromSide: "left", fromRatio: .32, toSide: "top", toRatio: .3, via: [[775, 196], [775, 2270], [2350, 2270], [2350, 2300]], label: "original condition z", labelAt: [1600, 2255], paths: ["video"] },
     { id: "e-xmask-restore", from: "xMask", to: "restoreCondition", type: "mask", fromSide: "bottom", toSide: "top", via: [[1808, 330], [1808, 2290], [2418, 2290]], paths: ["mask"] },
-    { id: "e-loop-back", from: "restoreCondition", to: "zCurrent", type: "loop", fromSide: "left", toSide: "top", via: [[760, 2396], [760, 115], [970, 115]], label: "step k+1 · 完整12槽回送", labelAt: [885, 96], paths: ["video"] },
+    { id: "e-loop-back", from: "restoreCondition", to: "zCurrent", type: "loop", fromSide: "left", toSide: "top", via: [[760, 2396], [760, 115], [970, 115]], label: "step k+1 · 完整12槽回送", labelAt: [950, 2380], paths: ["video"] },
     { id: "e-restore-slice", from: "restoreCondition", to: "futureSlice", type: "video", fromSide: "bottom", toSide: "top", via: [[2418, 2515], [1180, 2515], [1180, 2745]], label: "仅在第30步后", labelAt: [1780, 2500], paths: ["video"] },
     { id: "e-slice-decode", from: "futureSlice", to: "vaeDecode", type: "video", fromSide: "right", toSide: "left", paths: ["video"] },
     { id: "e-decode-rgb", from: "vaeDecode", to: "futureRgb", type: "video", fromSide: "right", toSide: "left", paths: ["video"] },
@@ -627,7 +627,7 @@
       segments: [
         { points: [[2985, 1165], [2985, 630], [2170, 630], [2170, 2022]] },
         { points: [[2985, 1165], [2920, 1165], [2920, 1892]] },
-        { points: [[2985, 1165], [3420, 1165], [3420, 2100], [2320, 2100]] },
+        { points: [[2985, 1165], [2985, 1280], [3420, 1280], [3420, 2100], [2320, 2100]] },
       ],
       junctions: [
         [2985, 1165, 13], [2170, 630, 9], [2920, 1165, 9], [3420, 1165, 9],
@@ -655,18 +655,18 @@
     },
     {
       id: "fanout-t-embed", from: "tEmbed", type: "time", fromSide: "right", fromRatio: .5, paths: ["time"],
-      trunk: [[1530, 712]], junctions: [[1530, 712, 13]], label: "shared E_t(t)", labelAt: [1650, 694],
+      trunk: [[1530, 712], [1530, 640]], junctions: [[1530, 640, 13]], label: "shared E_t(t)", labelAt: [1650, 622],
       branches: [
-        { edgeId: "e-tembed-repeat", points: [[1530, 712], [1530, 780], [1368, 780]], toSide: "top", toRatio: .5 },
-        { edgeId: "e-tembed-tblockt", points: [[1530, 712], [2205, 712], [2205, 777]], label: "Temporal has no direct action", labelAt: [1950, 694] },
-        { edgeId: "e-t-final", points: [[1530, 712], [1530, 430], [3460, 430], [3460, 2065], [2633, 2065]], toSide: "top", toRatio: .35 },
+        { edgeId: "e-tembed-repeat", points: [[1530, 640], [1530, 780], [1368, 780]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-tembed-tblockt", points: [[1530, 640], [2205, 640], [2205, 777]], label: "Temporal has no direct action", labelAt: [1950, 622] },
+        { edgeId: "e-t-final", points: [[1530, 640], [1700, 640], [1700, 430], [3460, 430], [3460, 2065], [2633, 2065]], toSide: "top", toRatio: .35 },
       ],
     },
     {
       id: "fanout-t-transform", from: "timestepTransform", type: "time", fromSide: "right", fromRatio: .5, paths: ["time", "mask"],
       trunk: [[1560, 346]], junctions: [[1560, 346, 13]], label: "same transformed t", labelAt: [1580, 326],
       branches: [
-        { edgeId: "e-transform-embed", points: [[1560, 346], [1560, 620], [1368, 620]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-transform-embed", points: [[1560, 346], [1385, 346], [1385, 620], [1368, 620]], toSide: "top", toRatio: .5 },
         { edgeId: "e-transform-xmask", points: [[1560, 346], [1560, 216]] },
       ],
     },
@@ -674,9 +674,9 @@
       id: "fanout-x-mask", from: "xMask", type: "mask", fromSide: "right", fromRatio: .5, paths: ["mask"],
       trunk: [[2010, 216]], junctions: [[2010, 216, 13]], label: "same x_mask", labelAt: [2140, 198],
       branches: [
-        { edgeId: "e-mask-t0", points: [[2010, 216], [2995, 216], [2995, 635], [3190, 635]], toSide: "top", toRatio: .5 },
-        { edgeId: "e-xmask-meaning", points: [[2010, 216], [2990, 216], [2990, 1060], [3190, 1060]], toSide: "top", toRatio: .5 },
-        { edgeId: "e-xmask-restore", points: [[2010, 216], [2010, 2290], [2418, 2290]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-mask-t0", points: [[2010, 216], [2010, 300], [2995, 300], [2995, 635], [3190, 635]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-xmask-meaning", points: [[2010, 216], [2010, 300], [2990, 300], [2990, 1060], [3190, 1060]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-xmask-restore", points: [[2010, 216], [2010, 300], [3500, 300], [3500, 2290], [2418, 2290]], toSide: "top", toRatio: .5 },
       ],
     },
     {
@@ -717,6 +717,10 @@
     marker.appendChild(make("path", { d: "M 1 1 L 11 6 L 1 11 z", fill: color }));
     defs.appendChild(marker);
   });
+  const detailFocusClip = make("clipPath", { id: "detail-focus-clip", clipPathUnits: "userSpaceOnUse" });
+  const detailFocusClipRect = make("rect", { x: 0, y: 0, width: canvas.width, height: canvas.height });
+  detailFocusClip.appendChild(detailFocusClipRect);
+  defs.appendChild(detailFocusClip);
   svg.appendChild(defs);
 
   const overviewLayer = make("g", { class: "overview-layer" });
@@ -728,11 +732,13 @@
 
   const panelLayer = make("g", { class: "panel-layer" });
   const edgeLayer = make("g", { class: "edge-layer" });
+  const panelHeaderLayer = make("g", { class: "panel-header-layer" });
   const nodeLayer = make("g", { class: "node-layer" });
   const labelLayer = make("g", { class: "label-layer" });
   const portLayer = make("g", { class: "port-layer" });
   const annotationLayer = make("g", { class: "annotation-layer" });
-  svg.append(overviewLayer, panelLayer, edgeLayer, nodeLayer, labelLayer, portLayer, annotationLayer);
+  svg.append(overviewLayer, panelLayer, edgeLayer, panelHeaderLayer, nodeLayer, labelLayer, portLayer, annotationLayer);
+  const detailLayers = [panelLayer, edgeLayer, panelHeaderLayer, nodeLayer, labelLayer, portLayer, annotationLayer];
 
   overviewLayer.insertBefore(make("rect", { x: 40, y: 45, width: 2620, height: 1545, rx: 30, class: "overview-backdrop" }), overviewEdgeLayer);
   overviewLayer.insertBefore(make("text", { x: 90, y: 115, class: "overview-heading" }, "一次看清：输入 → 30步采样 → STDiT3 → 8帧未来视频"), overviewEdgeLayer);
@@ -762,11 +768,11 @@
   const renderOverviewNode = (node) => {
     const group = make("g", { id: node.id, class: `overview-node kind-${node.kind}`, tabindex: "0", role: "button", "aria-label": `${node.title}，${node.concrete}`, "data-target": node.target, "data-paths": node.paths.join(" ") });
     group.appendChild(make("rect", { x: node.x, y: node.y, width: node.w, height: node.h, rx: 18 }));
-    group.appendChild(make("text", { x: node.x + 18, y: node.y + 28, class: "overview-step" }, node.step));
-    group.appendChild(make("text", { x: node.x + 18, y: node.y + 63, class: "overview-title" }, node.title));
-    const shapeText = make("text", { x: node.x + 18, y: node.y + 96, class: "overview-shape" }, node.concrete);
+    group.appendChild(make("text", { x: node.x + 18, y: node.y + 30, class: "overview-step" }, node.step));
+    group.appendChild(make("text", { x: node.x + 18, y: node.y + 70, class: "overview-title" }, node.title));
+    const shapeText = make("text", { x: node.x + 18, y: node.y + 105, class: "overview-shape" }, node.concrete);
     group.appendChild(shapeText);
-    group.appendChild(make("text", { x: node.x + 18, y: node.y + node.h - 18, class: "overview-note" }, node.note));
+    group.appendChild(make("text", { x: node.x + 18, y: node.y + node.h - 10, class: "overview-note" }, node.note));
     group.addEventListener("click", () => selectNode(node.target));
     group.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(node.target); }
@@ -862,12 +868,22 @@
   });
 
   panels.forEach((panel) => {
-    const g = make("g", { "data-panel": panel.id });
-    g.appendChild(make("rect", { x: panel.x, y: panel.y, width: panel.w, height: panel.h, rx: 24, class: `panel-box ${panel.cls}`.trim() }));
-    g.appendChild(make("text", { x: panel.x + 24, y: panel.y + 34, class: "panel-label" }, panel.label));
-    g.appendChild(make("text", { x: panel.x + 24, y: panel.y + 70, class: "panel-title" }, panel.title));
-    g.appendChild(make("text", { x: panel.x + 24, y: panel.y + 98, class: "panel-note" }, panel.note));
-    panelLayer.appendChild(g);
+    const boxGroup = make("g", { "data-panel-box": panel.id });
+    boxGroup.appendChild(make("rect", { x: panel.x, y: panel.y, width: panel.w, height: panel.h, rx: 24, class: `panel-box ${panel.cls}`.trim() }));
+    panelLayer.appendChild(boxGroup);
+
+    const headerBandX = panel.headerBandX ?? panel.x;
+    const headerWidth = panel.headerWidth ?? panel.w;
+    const headerHeight = panel.headerHeight ?? 70;
+    const headerX = headerBandX + 20;
+    const showNote = panel.showNote === true;
+    const headerGroup = make("g", { "data-panel": panel.id });
+    headerGroup.appendChild(make("rect", { x: headerBandX, y: panel.y, width: headerWidth, height: headerHeight, rx: 16, class: `panel-header-band ${panel.cls}`.trim() }));
+    headerGroup.appendChild(make("line", { x1: headerBandX + 12, y1: panel.y + headerHeight, x2: headerBandX + headerWidth - 12, y2: panel.y + headerHeight, class: "panel-header-rule" }));
+    headerGroup.appendChild(make("text", { x: headerX, y: panel.y + 22, class: "panel-label" }, panel.label));
+    headerGroup.appendChild(make("text", { x: headerX, y: panel.y + 50, class: "panel-title" }, panel.title));
+    if (showNote) headerGroup.appendChild(make("text", { x: headerX, y: panel.y + 76, class: "panel-note" }, panel.note));
+    panelHeaderLayer.appendChild(headerGroup);
   });
 
   const pointFor = (node, side = "right", ratio = 0.5) => {
@@ -898,12 +914,68 @@
   };
 
   const edgeElements = new Map();
+  const routedSegments = [];
+  const rememberRoute = (id, points, ignore = []) => {
+    if (points.length > 1) routedSegments.push({ id, points, ignore: new Set(ignore) });
+  };
+  const inflateRect = (rect, padding) => ({
+    x: rect.x - padding, y: rect.y - padding,
+    w: rect.w + padding * 2, h: rect.h + padding * 2,
+  });
+  const rectsOverlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  const overlapArea = (a, b) => {
+    const width = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+    const height = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    return width * height;
+  };
+  const panelHeaderRects = panels.map((panel) => ({
+    id: `header:${panel.id}`,
+    x: panel.headerBandX ?? panel.x,
+    y: panel.y,
+    w: panel.headerWidth ?? panel.w,
+    h: panel.headerHeight ?? 70,
+  }));
+  const fixedLabelObstacles = [
+    ...nodes.map((node) => ({ id: `node:${node.id}`, ...inflateRect(node, 10) })),
+    ...panelHeaderRects.map((rect) => ({ ...rect, ...inflateRect(rect, 8) })),
+  ];
+  const placedLabelRects = [];
+  const labelLayoutIssues = [];
+  const labelOffsets = [[0, 0]];
+  [36, 72, 108, 144, 180, 216, 252].forEach((distance) => {
+    labelOffsets.push(
+      [0, -distance], [0, distance], [-distance, 0], [distance, 0],
+      [-distance, -distance], [distance, -distance], [-distance, distance], [distance, distance],
+    );
+  });
+  const placeEdgeLabel = (text, at, width) => {
+    const makeBox = ([dx, dy]) => ({ x: at[0] + dx - width / 2, y: at[1] + dy - 19, w: width, h: 28, dx, dy });
+    const obstacles = [...fixedLabelObstacles, ...placedLabelRects];
+    const withinCanvas = (box) => box.x >= 12 && box.y >= 12 && box.x + box.w <= canvas.width - 12 && box.y + box.h <= canvas.height - 12;
+    let best = null;
+    labelOffsets.forEach((offset) => {
+      const box = makeBox(offset);
+      if (!withinCanvas(box)) return;
+      const score = obstacles.reduce((sum, obstacle) => sum + overlapArea(box, obstacle), 0);
+      const distance = Math.abs(offset[0]) + Math.abs(offset[1]);
+      if (!best || score < best.score || (score === best.score && distance < best.distance)) best = { ...box, score, distance };
+    });
+    best ||= makeBox([0, 0]);
+    if (best.score > 0) labelLayoutIssues.push(`label:${text}`);
+    placedLabelRects.push({ id: `label:${text}`, x: best.x, y: best.y, w: best.w, h: best.h });
+    return { x: best.x + width / 2, y: best.y + 19, dx: best.dx, dy: best.dy, box: best };
+  };
   const renderEdgeLabel = (text, at, paths, extraClass = "") => {
     if (!text || !at) return;
-    const group = make("g", { class: `edge-label-group ${extraClass}`.trim(), "data-paths": (paths || []).join(" ") });
     const width = Math.max(120, text.length * 13 + 28);
-    group.appendChild(make("rect", { x: at[0] - width / 2, y: at[1] - 19, width, height: 28, rx: 8, class: "edge-label-bg" }));
-    group.appendChild(make("text", { x: at[0], y: at[1], class: "edge-label" }, text));
+    const placement = placeEdgeLabel(text, at, width);
+    const shifted = placement.dx !== 0 || placement.dy !== 0;
+    const group = make("g", {
+      class: `edge-label-group ${extraClass} ${shifted ? "is-shifted" : ""}`.trim(),
+      "data-paths": (paths || []).join(" "), "data-origin-x": at[0], "data-origin-y": at[1],
+    });
+    group.appendChild(make("rect", { x: placement.x - width / 2, y: placement.y - 19, width, height: 28, rx: 8, class: "edge-label-bg" }));
+    group.appendChild(make("text", { x: placement.x, y: placement.y, class: "edge-label" }, text));
     labelLayer.appendChild(group);
   };
 
@@ -920,6 +992,7 @@
     });
     edgeLayer.appendChild(path);
     edgeElements.set(edge.id, path);
+    if (edge.via?.length) rememberRoute(edge.id, [geometry.start, ...edge.via, geometry.end], [edge.from, edge.to]);
     [geometry.start, geometry.end].forEach((point) => {
       portLayer.appendChild(make("circle", { cx: point[0], cy: point[1], r: 9, class: `port ${edge.type === "loop" ? "time" : edge.type}`, "data-paths": (edge.paths || []).join(" "), "vector-effect": "non-scaling-stroke" }));
     });
@@ -939,6 +1012,7 @@
       });
       edgeLayer.appendChild(trunk);
       edgeElements.set(`${fanout.id}-trunk`, trunk);
+      rememberRoute(`${fanout.id}-trunk`, trunkPoints, [fanout.from]);
     }
     (fanout.segments || []).forEach((segment, index) => {
       const rail = make("path", {
@@ -947,6 +1021,7 @@
       });
       edgeLayer.appendChild(rail);
       edgeElements.set(`${fanout.id}-rail-${index}`, rail);
+      rememberRoute(`${fanout.id}-rail-${index}`, segment.points);
     });
     portLayer.appendChild(make("circle", {
       cx: sourcePoint[0], cy: sourcePoint[1], r: 9, class: `port ${fanout.type} fanout-source`,
@@ -977,6 +1052,7 @@
       });
       edgeLayer.appendChild(branchPath);
       edgeElements.set(semanticEdge.id, branchPath);
+      rememberRoute(semanticEdge.id, branchPoints, [fanout.from, semanticEdge.to]);
       portLayer.appendChild(make("circle", {
         cx: end[0], cy: end[1], r: 9, class: `port ${semanticEdge.type} fanout-target`,
         "data-fanout-id": fanout.id, "data-paths": branchPaths.join(" "), "vector-effect": "non-scaling-stroke",
@@ -986,6 +1062,7 @@
   });
 
   let shapeMode = "concrete";
+  svg.dataset.shapeMode = shapeMode;
   const nodeElements = new Map();
   const shapeTextElements = new Map();
 
@@ -1002,7 +1079,8 @@
     group.appendChild(make("rect", { x: node.x, y: node.y, width: node.w, height: node.h, rx: 15, "vector-effect": "non-scaling-stroke" }));
     group.appendChild(make("text", { x: node.x + 15, y: node.y + 20, class: "node-kind" }, node.kindLabel));
     group.appendChild(make("text", { x: node.x + 15, y: node.y + 46, class: "node-title" }, node.title));
-    if (node.note) group.appendChild(make("text", { x: node.x + 15, y: node.y + 67, class: "node-note" }, node.note));
+    const showNodeNote = Boolean(node.note && node.h >= 96);
+    if (showNodeNote) group.appendChild(make("text", { x: node.x + 15, y: node.y + 67, class: "node-note" }, node.note));
     const shapeText = make("text", { x: node.x + 15, y: node.y + node.h - 12, class: "node-shape" }, node.shapes[shapeMode]);
     group.appendChild(shapeText);
     group.addEventListener("click", () => selectNode(node.id));
@@ -1070,22 +1148,26 @@
     inspector.classList.add("is-open");
     graphStage?.classList.add("has-inspector");
     openInspectorButton.hidden = true;
+    requestAnimationFrame(syncViewportHeight);
   };
 
   document.getElementById("close-inspector")?.addEventListener("click", () => {
     inspector.classList.remove("is-open");
     graphStage?.classList.remove("has-inspector");
     openInspectorButton.hidden = false;
+    requestAnimationFrame(syncViewportHeight);
   });
   openInspectorButton?.addEventListener("click", () => {
     inspector.classList.add("is-open");
     graphStage?.classList.add("has-inspector");
     openInspectorButton.hidden = true;
+    requestAnimationFrame(syncViewportHeight);
   });
 
   document.querySelectorAll("[data-shape-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       shapeMode = button.dataset.shapeMode;
+      svg.dataset.shapeMode = shapeMode;
       document.querySelectorAll("[data-shape-mode]").forEach((candidate) => {
         const active = candidate === button;
         candidate.classList.toggle("is-active", active);
@@ -1139,29 +1221,63 @@
     overview: { x: 0, y: 0, w: 2700, h: 1650 },
     all: { x: 0, y: 0, w: canvas.width, h: canvas.height },
     rollout: { x: 15, y: 35, w: 700, h: 2160 },
-    sampler: { x: 690, y: 25, w: 2890, h: 2640 },
-    action: { x: 775, y: 620, w: 790, h: 1530 },
-    spatial: { x: 1515, y: 620, w: 730, h: 1530 },
-    temporal: { x: 2190, y: 620, w: 780, h: 1530 },
-    output: { x: 690, y: 2050, w: 2890, h: 1090 },
+    sampler: { x: 740, y: 35, w: 1910, h: 410 },
+    action: { x: 780, y: 640, w: 760, h: 1490 },
+    spatial: { x: 1535, y: 650, w: 680, h: 1470 },
+    temporal: { x: 2210, y: 650, w: 735, h: 1470 },
+    mask: { x: 2900, y: 540, w: 630, h: 1590 },
+    output: { x: 2080, y: 2075, w: 1370, h: 505 },
+    decode: { x: 950, y: 2680, w: 1660, h: 420 },
   };
   let densityMode = "overview";
   let view = { ...views.overview };
+  let activeFocusName = null;
+
+  const syncViewportHeight = () => {
+    if (window.innerWidth <= 720) {
+      viewport.style.removeProperty("height");
+      return;
+    }
+    const availableWidth = Math.max(640, viewport.clientWidth || 1200);
+    const idealHeight = availableWidth * (view.h / view.w);
+    const maximum = activeFocusName ? 1700 : 1080;
+    const minimum = activeFocusName && view.w / view.h > 2 ? 440 : 680;
+    viewport.style.height = `${Math.round(Math.max(minimum, Math.min(maximum, idealHeight)))}px`;
+  };
+
+  const updateFocusClip = () => {
+    const clipped = densityMode === "detail" && Boolean(activeFocusName);
+    detailLayers.forEach((layer) => {
+      if (clipped) layer.setAttribute("clip-path", "url(#detail-focus-clip)");
+      else layer.removeAttribute("clip-path");
+    });
+    detailFocusClipRect.setAttribute("x", view.x);
+    detailFocusClipRect.setAttribute("y", view.y);
+    detailFocusClipRect.setAttribute("width", view.w);
+    detailFocusClipRect.setAttribute("height", view.h);
+    svg.classList.toggle("is-map-view", densityMode === "detail" && !activeFocusName);
+    svg.classList.toggle("is-focus-view", clipped);
+    viewport.classList.toggle("is-landscape-focus", clipped && view.w / view.h > 2);
+  };
 
   const updateViewBox = () => {
     view.w = Math.max(420, Math.min(canvas.width * 2.3, view.w));
     view.h = Math.max(360, Math.min(canvas.height * 2.3, view.h));
     view.x = Math.max(-canvas.width * .25, Math.min(canvas.width * 1.25 - view.w, view.x));
     view.y = Math.max(-canvas.height * .25, Math.min(canvas.height * 1.25 - view.h, view.y));
+    svg.setAttribute("preserveAspectRatio", window.innerWidth <= 720 ? "xMinYMin slice" : "xMidYMid meet");
     svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`);
     const baseWidth = densityMode === "overview" ? views.overview.w : canvas.width;
     const percent = Math.round((baseWidth / view.w) * 100);
     document.getElementById("zoom-value").textContent = `${percent}%`;
+    updateFocusClip();
   };
 
-  const setView = (nextView) => {
+  const setView = (nextView, focusName = null) => {
+    activeFocusName = focusName;
     view = { ...nextView };
     updateViewBox();
+    syncViewportHeight();
   };
 
   const markActiveFocus = (focusName) => {
@@ -1178,7 +1294,7 @@
     });
     if (resetView) {
       markActiveFocus(null);
-      setView(mode === "overview" ? views.overview : views.all);
+      setView(mode === "overview" ? views.overview : views.all, null);
     }
   };
   document.querySelectorAll("[data-density]").forEach((button) => button.addEventListener("click", () => setDensityMode(button.dataset.density)));
@@ -1186,7 +1302,7 @@
     button.addEventListener("click", () => {
       setDensityMode("detail", false);
       markActiveFocus(button.dataset.focus);
-      setView(views[button.dataset.focus] || views.all);
+      setView(views[button.dataset.focus] || views.all, button.dataset.focus === "all" ? null : button.dataset.focus);
     });
   });
 
@@ -1203,7 +1319,9 @@
   };
   document.getElementById("zoom-in")?.addEventListener("click", () => zoomAt(.82));
   document.getElementById("zoom-out")?.addEventListener("click", () => zoomAt(1.22));
-  document.getElementById("fit-graph")?.addEventListener("click", () => { markActiveFocus(null); setView(densityMode === "overview" ? views.overview : views.all); });
+  document.getElementById("fit-graph")?.addEventListener("click", () => { markActiveFocus(null); setView(densityMode === "overview" ? views.overview : views.all, null); });
+
+  window.addEventListener("resize", () => syncViewportHeight());
 
   viewport.addEventListener("wheel", (event) => {
     event.preventDefault();
@@ -1293,11 +1411,58 @@
       if (!overviewNodeById.has(branch.to)) fanoutFailures.push(`overview-target:${branch.id}`);
     });
   });
+  const layoutFailures = [...labelLayoutIssues];
+  const pointInsideNode = (point, node, padding = 12) => point[0] > node.x + padding && point[0] < node.x + node.w - padding && point[1] > node.y + padding && point[1] < node.y + node.h - padding;
+  const segmentCrossesNode = (start, end, node) => {
+    const distance = Math.hypot(end[0] - start[0], end[1] - start[1]);
+    const steps = Math.max(2, Math.ceil(distance / 10));
+    for (let index = 1; index < steps; index += 1) {
+      const ratio = index / steps;
+      const point = [start[0] + (end[0] - start[0]) * ratio, start[1] + (end[1] - start[1]) * ratio];
+      if (pointInsideNode(point, node)) return true;
+    }
+    return false;
+  };
+  for (let index = 0; index < nodes.length; index += 1) {
+    for (let other = index + 1; other < nodes.length; other += 1) {
+      if (rectsOverlap(nodes[index], nodes[other])) layoutFailures.push(`node-overlap:${nodes[index].id}/${nodes[other].id}`);
+    }
+  }
+  panelHeaderRects.forEach((header) => {
+    nodes.forEach((node) => {
+      if (rectsOverlap(header, node)) layoutFailures.push(`header-overlap:${header.id}/${node.id}`);
+    });
+  });
+  placedLabelRects.forEach((label, index) => {
+    nodes.forEach((node) => {
+      if (rectsOverlap(label, node)) layoutFailures.push(`label-node:${label.id}/${node.id}`);
+    });
+    panelHeaderRects.forEach((header) => {
+      if (rectsOverlap(label, header)) layoutFailures.push(`label-header:${label.id}/${header.id}`);
+    });
+    placedLabelRects.slice(index + 1).forEach((other) => {
+      if (rectsOverlap(label, other)) layoutFailures.push(`label-overlap:${label.id}/${other.id}`);
+    });
+  });
+  routedSegments.forEach((route) => {
+    nodes.forEach((node) => {
+      if (route.ignore.has(node.id)) return;
+      for (let index = 0; index < route.points.length - 1; index += 1) {
+        if (segmentCrossesNode(route.points[index], route.points[index + 1], node)) {
+          layoutFailures.push(`route-node:${route.id}/${node.id}`);
+          break;
+        }
+      }
+    });
+  });
+  nodes.forEach((node) => {
+    if (node.note && node.h >= 96 && node.h - 12 - 67 < 16) layoutFailures.push(`node-text:${node.id}`);
+  });
   const status = document.getElementById("shape-check-status");
-  if (failed.length === 0 && fanoutFailures.length === 0) {
-    status.textContent = `✓ ${checks.length} 项 shape contract · ${fanouts.length + overviewFanouts.length} 组 fan-out 路由已通过`;
+  if (failed.length === 0 && fanoutFailures.length === 0 && layoutFailures.length === 0) {
+    status.textContent = `✓ ${checks.length} 项 shape · ${fanouts.length + overviewFanouts.length} 组 fan-out · 布局避障通过`;
   } else {
-    const failures = [...failed.map(([name]) => name), ...fanoutFailures];
+    const failures = [...failed.map(([name]) => name), ...fanoutFailures, ...layoutFailures];
     status.textContent = `计算图校验失败：${failures.join(", ")}`;
     status.classList.add("is-error");
   }

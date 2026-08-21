@@ -43,14 +43,18 @@ code,pre{font-family:"Cascadia Code",Consolas,"Microsoft YaHei UI",monospace}
 .legend-junction{display:inline-grid;width:18px;height:18px;place-items:center;color:var(--cyan);font-size:17px;font-style:normal;line-height:1}
 .graph-stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr);overflow:hidden;max-width:1900px;margin:0 auto;border:1px solid var(--line-strong);background:var(--panel);box-shadow:var(--shadow);transition:grid-template-columns .18s ease}
 .graph-stage.has-inspector{grid-template-columns:minmax(0,1fr) minmax(330px,390px)}
-.compute-graph-viewport{height:min(78vh,900px);min-height:620px;overflow:hidden;outline:none;background:
+.compute-graph-viewport{height:min(78vh,900px);min-height:620px;overflow:hidden;outline:none;transition:height .22s ease;background:
   linear-gradient(rgba(41,70,83,.18) 1px,transparent 1px),
   linear-gradient(90deg,rgba(41,70,83,.18) 1px,transparent 1px),var(--bg);background-size:28px 28px;cursor:grab;touch-action:none}
 .compute-graph-viewport.is-dragging{cursor:grabbing}
+.compute-graph-viewport.is-landscape-focus{min-height:440px}
 #compute-graph{display:block;overflow:hidden;width:100%;height:100%;user-select:none}
 #compute-graph text{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;pointer-events:none}
-#compute-graph.mode-overview .panel-layer,#compute-graph.mode-overview .edge-layer,#compute-graph.mode-overview .node-layer,#compute-graph.mode-overview .label-layer,#compute-graph.mode-overview .port-layer,#compute-graph.mode-overview .annotation-layer{display:none}
+#compute-graph.mode-overview .panel-layer,#compute-graph.mode-overview .edge-layer,#compute-graph.mode-overview .panel-header-layer,#compute-graph.mode-overview .node-layer,#compute-graph.mode-overview .label-layer,#compute-graph.mode-overview .port-layer,#compute-graph.mode-overview .annotation-layer{display:none}
 #compute-graph.mode-detail .overview-layer{display:none}
+#compute-graph.mode-detail.is-map-view .cg-node .node-kind,#compute-graph.mode-detail.is-map-view .cg-node .node-note,#compute-graph.mode-detail.is-map-view .edge-label-group,#compute-graph.mode-detail.is-map-view .annotation-layer{display:none}
+#compute-graph.mode-detail.is-map-view .cg-node .node-title{font-size:30px}
+#compute-graph.mode-detail.is-map-view .cg-node .node-shape{display:block;font-size:22px}
 #compute-graph .overview-backdrop{fill:rgba(8,23,33,.76);stroke:var(--line);stroke-width:2}
 #compute-graph .overview-heading{fill:var(--text);font-size:34px;font-weight:700}
 #compute-graph .overview-subtitle{fill:var(--muted);font-size:22px}
@@ -85,6 +89,12 @@ code,pre{font-family:"Cascadia Code",Consolas,"Microsoft YaHei UI",monospace}
 #compute-graph .panel-box.model{fill:rgba(8,23,33,.72);stroke:rgba(100,174,245,.5);stroke-width:2}
 #compute-graph .panel-box.spatial{fill:rgba(100,174,245,.025);stroke:rgba(100,174,245,.38)}
 #compute-graph .panel-box.temporal{fill:rgba(189,148,244,.025);stroke:rgba(189,148,244,.38)}
+#compute-graph .panel-header-band{fill:rgba(7,19,29,.98);stroke:var(--line);stroke-width:1.5}
+#compute-graph .panel-header-band.sampler{fill:rgba(14,33,44,.98);stroke:rgba(242,167,102,.68)}
+#compute-graph .panel-header-band.model{fill:rgba(8,23,33,.99);stroke:rgba(100,174,245,.62)}
+#compute-graph .panel-header-band.spatial{stroke:rgba(100,174,245,.55)}
+#compute-graph .panel-header-band.temporal{stroke:rgba(189,148,244,.55)}
+#compute-graph .panel-header-rule{stroke:var(--line-strong);stroke-width:1.5}
 #compute-graph .panel-label{fill:var(--muted);font-size:16px;font-weight:800;letter-spacing:.13em}
 #compute-graph .panel-title{fill:var(--text);font-size:25px;font-weight:700}
 #compute-graph .panel-note{fill:var(--muted);font-size:15px}
@@ -122,12 +132,13 @@ code,pre{font-family:"Cascadia Code",Consolas,"Microsoft YaHei UI",monospace}
 #compute-graph .fanout-junction.is-highlighted,#compute-graph .fanout-tap.is-highlighted{filter:drop-shadow(0 0 7px currentColor)}
 #compute-graph .edge.is-dimmed{opacity:.09}
 #compute-graph .edge.is-highlighted{stroke-width:8;opacity:1;filter:drop-shadow(0 0 6px currentColor)}
-#compute-graph .edge-label-bg{fill:rgba(7,19,29,.92);stroke:var(--line);stroke-width:1}
+#compute-graph .edge-label-bg{fill:rgba(7,19,29,.985);stroke:var(--line);stroke-width:1}
+#compute-graph .edge-label-group.is-shifted .edge-label-bg{stroke:var(--line-strong)}
 #compute-graph .edge-label{fill:var(--muted);font-family:"Cascadia Code",Consolas,monospace;font-size:13px;font-weight:700;text-anchor:middle}
 #compute-graph .port{stroke:var(--bg);stroke-width:3}
 #compute-graph .port.video{fill:var(--video)}#compute-graph .port.action{fill:var(--action)}#compute-graph .port.time{fill:var(--time)}#compute-graph .port.mask{fill:var(--mask)}#compute-graph .port.disabled{fill:var(--disabled)}
 #compute-graph .edge-label-group.is-dimmed,.port.is-dimmed,.fanout-junction.is-dimmed,.fanout-tap.is-dimmed{opacity:.1}
-#compute-graph .annotation-box{fill:rgba(7,19,29,.78);stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 6}
+#compute-graph .annotation-box{fill:rgba(7,19,29,.97);stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 6}
 #compute-graph .annotation-title{fill:var(--cyan);font-size:15px;font-weight:800}
 #compute-graph .annotation-text{fill:var(--muted);font-size:14px}
 .compute-inspector{position:relative;z-index:8;display:none;align-content:start;width:100%;max-height:min(78vh,900px);overflow:auto;gap:11px;padding:19px;border-left:1px solid var(--line-strong);background:rgba(7,19,29,.98);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease}
@@ -160,6 +171,12 @@ footer{padding:18px 30px 34px;border-top:1px solid var(--line);color:var(--muted
   .compute-toolbar{align-items:flex-start;flex-direction:column}.tool-group{width:100%}.zoom-tools{width:auto}
   .graph-legend{justify-content:flex-start;padding:0 5px}
   .compute-graph-viewport{height:650px;min-height:520px}
+  #compute-graph.mode-detail .cg-node .node-kind{font-size:15px}
+  #compute-graph.mode-detail .cg-node .node-title{font-size:22px}
+  #compute-graph.mode-detail .cg-node .node-note{font-size:15px}
+  #compute-graph.mode-detail .cg-node .node-shape{font-size:16px}
+  #compute-graph.mode-detail .edge-label{font-size:15px}
+  #compute-graph.mode-detail.is-map-view .cg-node .node-title{font-size:45px}
   .graph-stage.has-inspector{grid-template-columns:1fr}
   .compute-inspector{max-height:none;border-top:1px solid var(--line-strong);border-left:0}
   .inspector-shapes{grid-template-columns:1fr}.shape-contract{padding:14px}
