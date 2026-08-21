@@ -40,6 +40,7 @@ code,pre{font-family:"Cascadia Code",Consolas,"Microsoft YaHei UI",monospace}
 .graph-legend span{display:flex;align-items:center;gap:7px}
 .legend-line{display:inline-block;width:32px;height:0;border-top:3px solid var(--video)}
 .legend-line.action{border-top-color:var(--action);border-top-style:dashed}.legend-line.time{border-top-color:var(--time);border-top-style:dashed}.legend-line.mask{border-top-color:var(--mask);border-top-style:dotted}.legend-line.disabled{border-top-color:var(--disabled);border-top-style:dashed;opacity:.65}
+.legend-junction{display:inline-grid;width:18px;height:18px;place-items:center;color:var(--cyan);font-size:17px;font-style:normal;line-height:1}
 .graph-stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr);overflow:hidden;max-width:1900px;margin:0 auto;border:1px solid var(--line-strong);background:var(--panel);box-shadow:var(--shadow);transition:grid-template-columns .18s ease}
 .graph-stage.has-inspector{grid-template-columns:minmax(0,1fr) minmax(330px,390px)}
 .compute-graph-viewport{height:min(78vh,900px);min-height:620px;overflow:hidden;outline:none;background:
@@ -109,13 +110,23 @@ code,pre{font-family:"Cascadia Code",Consolas,"Microsoft YaHei UI",monospace}
 #compute-graph .edge.mask{stroke:var(--mask);stroke-dasharray:3 8}
 #compute-graph .edge.disabled{stroke:var(--disabled);stroke-dasharray:8 9;opacity:.45}
 #compute-graph .edge.loop{stroke:var(--time);stroke-width:6}
+#compute-graph .fanout-trunk,#compute-graph .fanout-rail{marker-end:none}
+#compute-graph .fanout-trunk{stroke-width:6}
+#compute-graph .fanout-rail{stroke-width:4;opacity:.82}
+#compute-graph .fanout-junction{stroke:var(--bg);stroke-width:4}
+#compute-graph .fanout-tap{stroke:var(--bg);stroke-width:3}
+#compute-graph .fanout-junction.video,#compute-graph .fanout-tap.video{fill:var(--video)}
+#compute-graph .fanout-junction.action,#compute-graph .fanout-tap.action{fill:var(--action)}
+#compute-graph .fanout-junction.time,#compute-graph .fanout-tap.time{fill:var(--time)}
+#compute-graph .fanout-junction.mask,#compute-graph .fanout-tap.mask{fill:var(--mask)}
+#compute-graph .fanout-junction.is-highlighted,#compute-graph .fanout-tap.is-highlighted{filter:drop-shadow(0 0 7px currentColor)}
 #compute-graph .edge.is-dimmed{opacity:.09}
 #compute-graph .edge.is-highlighted{stroke-width:8;opacity:1;filter:drop-shadow(0 0 6px currentColor)}
 #compute-graph .edge-label-bg{fill:rgba(7,19,29,.92);stroke:var(--line);stroke-width:1}
 #compute-graph .edge-label{fill:var(--muted);font-family:"Cascadia Code",Consolas,monospace;font-size:13px;font-weight:700;text-anchor:middle}
 #compute-graph .port{stroke:var(--bg);stroke-width:3}
 #compute-graph .port.video{fill:var(--video)}#compute-graph .port.action{fill:var(--action)}#compute-graph .port.time{fill:var(--time)}#compute-graph .port.mask{fill:var(--mask)}#compute-graph .port.disabled{fill:var(--disabled)}
-#compute-graph .edge-label-group.is-dimmed,.port.is-dimmed{opacity:.1}
+#compute-graph .edge-label-group.is-dimmed,.port.is-dimmed,.fanout-junction.is-dimmed,.fanout-tap.is-dimmed{opacity:.1}
 #compute-graph .annotation-box{fill:rgba(7,19,29,.78);stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 6}
 #compute-graph .annotation-title{fill:var(--cyan);font-size:15px;font-weight:800}
 #compute-graph .annotation-text{fill:var(--muted);font-size:14px}

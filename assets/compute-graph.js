@@ -55,6 +55,7 @@
     if (text) element.textContent = text;
     return element;
   };
+  const pathFromPoints = (points) => points.map((point, index) => `${index ? "L" : "M"} ${point[0]} ${point[1]}`).join(" ");
 
   const shape = (concrete, symbolic) => ({ concrete, symbolic });
   const io = (concrete, symbolic = concrete) => ({ concrete, symbolic });
@@ -590,6 +591,123 @@
     { id: "e-decode-rgb", from: "vaeDecode", to: "futureRgb", type: "video", fromSide: "right", toSide: "left", paths: ["video"] },
   ];
 
+  // A fan-out is a visual routing primitive, not a model operator. Semantic
+  // dependencies stay in `edges`; these descriptors only replace repeated
+  // source-to-target paths with one trunk, explicit junctions, and short taps.
+  const fanouts = [
+    {
+      id: "fanout-spatial-mod", from: "spatialChunk", type: "action", fromSide: "right", fromRatio: .5, paths: ["action", "time"],
+      trunk: [[1640, 2042]], segments: [{ points: [[1640, 984], [1640, 2179]] }],
+      junctions: [[1640, 2042, 13], [1640, 984, 6], [1640, 1546, 6], [1640, 1762, 6], [1640, 2001, 6], [1640, 2179, 6]],
+      label: "Spatial modulation · 6H", labelAt: [1650, 930],
+      branches: [
+        { edgeId: "e-sch-ada1", points: [[1640, 984]], label: "shift / scale msa", labelAt: [1740, 968] },
+        { edgeId: "e-sch-gate1", points: [[1640, 1546]], label: "gate msa", labelAt: [1735, 1530] },
+        { edgeId: "e-sch-ada2", points: [[1640, 1762]], label: "shift / scale mlp", labelAt: [1740, 1746] },
+        { edgeId: "e-sch-x2", points: [[1640, 2001]], label: "gate mlp", labelAt: [1735, 1985] },
+        { edgeId: "e-sch-remaining", points: [[1640, 2179]], label: "same params → every Spatial", labelAt: [1860, 2163] },
+      ],
+    },
+    {
+      id: "fanout-temporal-mod", from: "temporalChunk", type: "time", fromSide: "right", fromRatio: .5, paths: ["time"],
+      trunk: [[2520, 1128]], segments: [{ points: [[2520, 894], [2520, 2100]] }],
+      junctions: [[2520, 1128, 13], [2520, 894, 6], [2520, 1500, 6], [2520, 1618, 6], [2520, 1859, 6], [2520, 2100, 6]],
+      label: "Temporal modulation · 6H", labelAt: [2710, 835],
+      branches: [
+        { edgeId: "e-tch-ada1", points: [[2520, 894]] },
+        { edgeId: "e-tch-gate1", points: [[2520, 1500]] },
+        { edgeId: "e-tch-ada2", points: [[2520, 1618]] },
+        { edgeId: "e-tch-out", points: [[2520, 1859]] },
+        { edgeId: "e-tch-remaining", points: [[2520, 2100], [2320, 2100]], label: "same params → every Temporal", labelAt: [2410, 2084], toSide: "top", toRatio: .5 },
+      ],
+    },
+    {
+      id: "fanout-mask-selectors", from: "maskMeaning", type: "mask", fromSide: "left", fromRatio: .5, paths: ["mask"],
+      trunk: [[2985, 1165]],
+      segments: [
+        { points: [[2985, 1165], [2985, 630], [2170, 630], [2170, 2022]] },
+        { points: [[2985, 1165], [2920, 1165], [2920, 1892]] },
+        { points: [[2985, 1165], [3420, 1165], [3420, 2100], [2320, 2100]] },
+      ],
+      junctions: [
+        [2985, 1165, 13], [2170, 630, 9], [2920, 1165, 9], [3420, 1165, 9],
+        [2170, 1007, 6], [2170, 1540, 6], [2170, 1782, 6], [2170, 2022, 6],
+        [2920, 931, 6], [2920, 1532, 6], [2920, 1651, 6], [2920, 1892, 6],
+        [2399, 2100, 6], [2726, 2100, 6],
+      ],
+      labels: [
+        { text: "Spatial selectors ×4", at: [2520, 614] },
+        { text: "Temporal selectors ×4", at: [2850, 1060] },
+        { text: "remaining Pairs + Final", at: [3030, 2084] },
+      ],
+      branches: [
+        { edgeId: "e-mask-spada1", points: [[2170, 1007]] },
+        { edgeId: "e-mask-spgate1", points: [[2170, 1540]] },
+        { edgeId: "e-mask-spada2", points: [[2170, 1782]] },
+        { edgeId: "e-mask-spx2", points: [[2170, 2022]] },
+        { edgeId: "e-mask-tmada1", points: [[2920, 931]] },
+        { edgeId: "e-mask-tmgate1", points: [[2920, 1532]] },
+        { edgeId: "e-mask-tmada2", points: [[2920, 1651]] },
+        { edgeId: "e-mask-tmout", points: [[2920, 1892]] },
+        { edgeId: "e-mask-remaining", points: [[2399, 2100]], toSide: "top", toRatio: .72 },
+        { edgeId: "e-mask-final", points: [[2726, 2100]], toSide: "top", toRatio: .7 },
+      ],
+    },
+    {
+      id: "fanout-t-embed", from: "tEmbed", type: "time", fromSide: "right", fromRatio: .5, paths: ["time"],
+      trunk: [[1530, 712]], junctions: [[1530, 712, 13]], label: "shared E_t(t)", labelAt: [1650, 694],
+      branches: [
+        { edgeId: "e-tembed-repeat", points: [[1530, 712], [1530, 780], [1368, 780]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-tembed-tblockt", points: [[1530, 712], [2205, 712], [2205, 777]], label: "Temporal has no direct action", labelAt: [1950, 694] },
+        { edgeId: "e-t-final", points: [[1530, 712], [1530, 430], [3460, 430], [3460, 2065], [2633, 2065]], toSide: "top", toRatio: .35 },
+      ],
+    },
+    {
+      id: "fanout-t-transform", from: "timestepTransform", type: "time", fromSide: "right", fromRatio: .5, paths: ["time", "mask"],
+      trunk: [[1560, 346]], junctions: [[1560, 346, 13]], label: "same transformed t", labelAt: [1580, 326],
+      branches: [
+        { edgeId: "e-transform-embed", points: [[1560, 346], [1560, 620], [1368, 620]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-transform-xmask", points: [[1560, 346], [1560, 216]] },
+      ],
+    },
+    {
+      id: "fanout-x-mask", from: "xMask", type: "mask", fromSide: "right", fromRatio: .5, paths: ["mask"],
+      trunk: [[2010, 216]], junctions: [[2010, 216, 13]], label: "same x_mask", labelAt: [2140, 198],
+      branches: [
+        { edgeId: "e-mask-t0", points: [[2010, 216], [2995, 216], [2995, 635], [3190, 635]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-xmask-meaning", points: [[2010, 216], [2990, 216], [2990, 1060], [3190, 1060]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-xmask-restore", points: [[2010, 216], [2010, 2290], [2418, 2290]], toSide: "top", toRatio: .5 },
+      ],
+    },
+    {
+      id: "fanout-z-current", from: "zCurrent", type: "video", fromSide: "left", fromRatio: .5, paths: ["video"],
+      trunk: [[760, 216]], segments: [{ points: [[760, 216], [760, 2305]] }],
+      junctions: [[760, 216, 13], [760, 450, 6], [760, 2270, 6], [760, 2305, 6]],
+      label: "z_current fan-out", labelAt: [845, 434],
+      branches: [
+        { edgeId: "e-z-patch", points: [[760, 450], [950, 450]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-z-restore", points: [[760, 2270], [2350, 2270], [2350, 2300]], label: "pre-update condition z", labelAt: [1600, 2255] },
+        { edgeId: "e-z-update", points: [[760, 2305], [2600, 2305], [2600, 2374]], label: "residual z_current", labelAt: [1830, 2290] },
+      ],
+    },
+    {
+      id: "fanout-t0-embed", from: "t0Embed", type: "mask", fromSide: "right", fromRatio: .5, paths: ["mask"],
+      trunk: [[3380, 848]], junctions: [[3380, 848, 13]], label: "shared E_t(15)", labelAt: [3390, 828],
+      branches: [
+        { edgeId: "e-t0-block", points: [[3380, 848], [3380, 900], [3190, 900]], toSide: "top", toRatio: .5 },
+        { edgeId: "e-t0-final", points: [[3380, 848], [3380, 2075], [2678, 2075]], toSide: "top", toRatio: .52 },
+      ],
+    },
+    {
+      id: "fanout-t0-block", from: "t0Block", type: "mask", fromSide: "bottom", fromRatio: .5, paths: ["mask"],
+      trunk: [[3190, 1050]], junctions: [[3190, 1050, 13]],
+      branches: [
+        { edgeId: "e-t0-selectors", points: [[3190, 1050]], toSide: "top", toRatio: .35 },
+        { edgeId: "e-t0-caveat", points: [[3190, 1050], [3360, 1050], [3360, 1250], [3190, 1250]], toSide: "top", toRatio: .5 },
+      ],
+    },
+  ];
+
   const defs = make("defs");
   [
     ["video", "#64aef5"], ["action", "#62e0ad"], ["time", "#f2a766"],
@@ -670,9 +788,20 @@
     { id: "overview-edge-action-build", from: "overview-action", to: "overview-action-condition", type: "action", paths: ["action"] },
     { id: "overview-edge-action-pair", from: "overview-action-condition", to: "overview-pair", type: "action", fromSide: "top", toSide: "bottom", fromRatio: .35, toRatio: .28, via: [[793, 815], [264, 815]], paths: ["action"] },
     { id: "overview-edge-time-pair", from: "overview-time", to: "overview-pair", type: "time", fromSide: "right", toSide: "bottom", toRatio: .52, via: [[540, 1235], [540, 800], [412, 800]], paths: ["time"] },
-    { id: "overview-edge-mask-pair", from: "overview-mask", to: "overview-pair", type: "mask", fromSide: "top", toSide: "bottom", fromRatio: .3, toRatio: .78, via: [[764, 790], [574, 790]], paths: ["mask"] },
-    { id: "overview-edge-mask-final", from: "overview-mask", to: "overview-final", type: "mask", fromSide: "right", toSide: "bottom", toRatio: .22, via: [[1250, 1235], [1250, 810], [1502, 810]], paths: ["mask"] },
     { id: "overview-edge-loop", from: "overview-final", to: "overview-rflow", type: "loop", fromSide: "bottom", toSide: "bottom", fromRatio: .72, toRatio: .5, via: [[1802, 1480], [1360, 1480]], label: "restore history → 完整12槽进入 step k+1 · 共30步", labelAt: [1580, 1455], paths: ["video", "time", "mask"] },
+  ];
+
+  const overviewFanouts = [
+    {
+      id: "overview-fanout-mask", from: "overview-mask", type: "mask", fromSide: "top", fromRatio: .5, paths: ["mask"],
+      trunk: [[880, 810]], segments: [{ points: [[574, 810], [1502, 810]] }],
+      junctions: [[880, 810, 13], [574, 810, 7], [1502, 810, 7]],
+      label: "same x_mask / t₀ selector", labelAt: [1110, 790],
+      branches: [
+        { id: "overview-edge-mask-pair", to: "overview-pair", points: [[574, 810]], toSide: "bottom", toRatio: .78 },
+        { id: "overview-edge-mask-final", to: "overview-final", points: [[1502, 810]], toSide: "bottom", toRatio: .22 },
+      ],
+    },
   ];
 
   const overviewPoint = (node, side = "right", ratio = .5) => {
@@ -696,6 +825,42 @@
     if (edge.label) overviewLabelLayer.appendChild(make("text", { x: edge.labelAt[0], y: edge.labelAt[1], class: "overview-edge-label", "data-paths": edge.paths.join(" ") }, edge.label));
   });
 
+  overviewFanouts.forEach((fanout) => {
+    const source = overviewNodeById.get(fanout.from);
+    const sourcePoint = overviewPoint(source, fanout.fromSide || "right", fanout.fromRatio ?? .5);
+    const trunk = make("path", {
+      id: `${fanout.id}-trunk`, d: pathFromPoints([sourcePoint, ...fanout.trunk]), class: `overview-edge ${fanout.type} fanout-trunk`,
+      "data-paths": fanout.paths.join(" "), "vector-effect": "non-scaling-stroke",
+    });
+    overviewEdgeLayer.appendChild(trunk);
+    overviewEdgeElements.set(`${fanout.id}-trunk`, trunk);
+    fanout.segments.forEach((segment, index) => {
+      const rail = make("path", {
+        id: `${fanout.id}-rail-${index}`, d: pathFromPoints(segment.points), class: `overview-edge ${fanout.type} fanout-rail`,
+        "data-paths": fanout.paths.join(" "), "vector-effect": "non-scaling-stroke",
+      });
+      overviewEdgeLayer.appendChild(rail);
+      overviewEdgeElements.set(`${fanout.id}-rail-${index}`, rail);
+    });
+    overviewPortLayer.appendChild(make("circle", { cx: sourcePoint[0], cy: sourcePoint[1], r: 10, class: `overview-port ${fanout.type}`, "data-fanout-id": fanout.id, "data-paths": fanout.paths.join(" ") }));
+    fanout.junctions.forEach(([x, y, radius]) => overviewPortLayer.appendChild(make("circle", {
+      cx: x, cy: y, r: radius, class: `overview-port ${fanout.type} ${radius >= 9 ? "fanout-junction" : "fanout-tap"}`,
+      "data-fanout-id": fanout.id, "data-paths": fanout.paths.join(" "),
+    })));
+    fanout.branches.forEach((branch) => {
+      const target = overviewNodeById.get(branch.to);
+      const end = overviewPoint(target, branch.toSide || "left", branch.toRatio ?? .5);
+      const path = make("path", {
+        id: branch.id, d: pathFromPoints([...branch.points, end]), class: `overview-edge ${fanout.type} fanout-branch`,
+        "data-fanout-id": fanout.id, "data-paths": fanout.paths.join(" "), "marker-end": `url(#arrow-${fanout.type})`, "vector-effect": "non-scaling-stroke",
+      });
+      overviewEdgeLayer.appendChild(path);
+      overviewEdgeElements.set(branch.id, path);
+      overviewPortLayer.appendChild(make("circle", { cx: end[0], cy: end[1], r: 10, class: `overview-port ${fanout.type}`, "data-fanout-id": fanout.id, "data-paths": fanout.paths.join(" ") }));
+    });
+    overviewLabelLayer.appendChild(make("text", { x: fanout.labelAt[0], y: fanout.labelAt[1], class: "overview-edge-label", "data-paths": fanout.paths.join(" ") }, fanout.label));
+  });
+
   panels.forEach((panel) => {
     const g = make("g", { "data-panel": panel.id });
     g.appendChild(make("rect", { x: panel.x, y: panel.y, width: panel.w, height: panel.h, rx: 24, class: `panel-box ${panel.cls}`.trim() }));
@@ -711,6 +876,9 @@
     if (side === "top") return [node.x + node.w * ratio, node.y];
     return [node.x + node.w * ratio, node.y + node.h];
   };
+
+  const edgeById = new Map(edges.map((edge) => [edge.id, edge]));
+  const fanoutEdgeIds = new Set(fanouts.flatMap((fanout) => fanout.branches.map((branch) => branch.edgeId)));
 
   const linePath = (edge) => {
     const fromNode = nodeById.get(edge.from);
@@ -730,7 +898,17 @@
   };
 
   const edgeElements = new Map();
+  const renderEdgeLabel = (text, at, paths, extraClass = "") => {
+    if (!text || !at) return;
+    const group = make("g", { class: `edge-label-group ${extraClass}`.trim(), "data-paths": (paths || []).join(" ") });
+    const width = Math.max(120, text.length * 13 + 28);
+    group.appendChild(make("rect", { x: at[0] - width / 2, y: at[1] - 19, width, height: 28, rx: 8, class: "edge-label-bg" }));
+    group.appendChild(make("text", { x: at[0], y: at[1], class: "edge-label" }, text));
+    labelLayer.appendChild(group);
+  };
+
   edges.forEach((edge) => {
+    if (fanoutEdgeIds.has(edge.id)) return;
     const geometry = linePath(edge);
     const path = make("path", {
       id: edge.id,
@@ -745,13 +923,66 @@
     [geometry.start, geometry.end].forEach((point) => {
       portLayer.appendChild(make("circle", { cx: point[0], cy: point[1], r: 9, class: `port ${edge.type === "loop" ? "time" : edge.type}`, "data-paths": (edge.paths || []).join(" "), "vector-effect": "non-scaling-stroke" }));
     });
-    if (edge.label && edge.labelAt) {
-      const group = make("g", { class: "edge-label-group", "data-paths": (edge.paths || []).join(" ") });
-      const width = Math.max(120, edge.label.length * 13 + 28);
-      group.appendChild(make("rect", { x: edge.labelAt[0] - width / 2, y: edge.labelAt[1] - 19, width, height: 28, rx: 8, class: "edge-label-bg" }));
-      group.appendChild(make("text", { x: edge.labelAt[0], y: edge.labelAt[1], class: "edge-label" }, edge.label));
-      labelLayer.appendChild(group);
+    renderEdgeLabel(edge.label, edge.labelAt, edge.paths);
+  });
+
+  fanouts.forEach((fanout) => {
+    const source = nodeById.get(fanout.from);
+    if (!source) return;
+    const groupPaths = fanout.paths || [];
+    const sourcePoint = pointFor(source, fanout.fromSide || "right", fanout.fromRatio ?? .5);
+    const trunkPoints = [sourcePoint, ...(fanout.trunk || [])];
+    if (trunkPoints.length > 1) {
+      const trunk = make("path", {
+        id: `${fanout.id}-trunk`, class: `edge ${fanout.type} fanout-trunk`, d: pathFromPoints(trunkPoints),
+        "data-paths": groupPaths.join(" "), "vector-effect": "non-scaling-stroke",
+      });
+      edgeLayer.appendChild(trunk);
+      edgeElements.set(`${fanout.id}-trunk`, trunk);
     }
+    (fanout.segments || []).forEach((segment, index) => {
+      const rail = make("path", {
+        id: `${fanout.id}-rail-${index}`, class: `edge ${fanout.type} fanout-rail`, d: pathFromPoints(segment.points),
+        "data-paths": (segment.paths || groupPaths).join(" "), "vector-effect": "non-scaling-stroke",
+      });
+      edgeLayer.appendChild(rail);
+      edgeElements.set(`${fanout.id}-rail-${index}`, rail);
+    });
+    portLayer.appendChild(make("circle", {
+      cx: sourcePoint[0], cy: sourcePoint[1], r: 9, class: `port ${fanout.type} fanout-source`,
+      "data-fanout-id": fanout.id, "data-paths": groupPaths.join(" "), "vector-effect": "non-scaling-stroke",
+    }));
+    (fanout.junctions || []).forEach(([x, y, radius = 6], index) => {
+      const isRoot = radius >= 9;
+      portLayer.appendChild(make("circle", {
+        cx: x, cy: y, r: radius, class: `port ${fanout.type} ${isRoot ? "fanout-junction" : "fanout-tap"}`,
+        "data-fanout-id": fanout.id, "data-junction-index": index, "data-paths": groupPaths.join(" "), "vector-effect": "non-scaling-stroke",
+      }));
+    });
+    renderEdgeLabel(fanout.label, fanout.labelAt, groupPaths, "fanout-label");
+    (fanout.labels || []).forEach((label) => renderEdgeLabel(label.text, label.at, label.paths || groupPaths, "fanout-label"));
+
+    fanout.branches.forEach((branch) => {
+      const semanticEdge = edgeById.get(branch.edgeId);
+      if (!semanticEdge) return;
+      const target = nodeById.get(semanticEdge.to);
+      if (!target) return;
+      const end = pointFor(target, branch.toSide || semanticEdge.toSide || "left", branch.toRatio ?? semanticEdge.toRatio ?? .5);
+      const branchPoints = [...branch.points, end];
+      const branchPaths = [...new Set([...groupPaths, ...(semanticEdge.paths || [])])];
+      const branchPath = make("path", {
+        id: semanticEdge.id, class: `edge ${semanticEdge.type} fanout-branch`, d: pathFromPoints(branchPoints),
+        "data-fanout-id": fanout.id, "data-paths": branchPaths.join(" "),
+        "marker-end": `url(#arrow-${semanticEdge.type})`, "vector-effect": "non-scaling-stroke",
+      });
+      edgeLayer.appendChild(branchPath);
+      edgeElements.set(semanticEdge.id, branchPath);
+      portLayer.appendChild(make("circle", {
+        cx: end[0], cy: end[1], r: 9, class: `port ${semanticEdge.type} fanout-target`,
+        "data-fanout-id": fanout.id, "data-paths": branchPaths.join(" "), "vector-effect": "non-scaling-stroke",
+      }));
+      renderEdgeLabel(branch.label, branch.labelAt, branchPaths, "fanout-branch-label");
+    });
   });
 
   let shapeMode = "concrete";
@@ -887,13 +1118,19 @@
       element.classList.toggle("is-highlighted", Boolean(activePath && matches(element)));
     });
     labelLayer.querySelectorAll(".edge-label-group").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
-    portLayer.querySelectorAll(".port").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
+    portLayer.querySelectorAll(".port").forEach((element) => {
+      element.classList.toggle("is-dimmed", !matches(element));
+      element.classList.toggle("is-highlighted", Boolean(activePath && matches(element)));
+    });
     overviewNodeElements.forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
     overviewEdgeElements.forEach((element) => {
       element.classList.toggle("is-dimmed", !matches(element));
       element.classList.toggle("is-highlighted", Boolean(activePath && matches(element)));
     });
-    overviewPortLayer.querySelectorAll(".overview-port").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
+    overviewPortLayer.querySelectorAll(".overview-port").forEach((element) => {
+      element.classList.toggle("is-dimmed", !matches(element));
+      element.classList.toggle("is-highlighted", Boolean(activePath && matches(element)));
+    });
     overviewLabelLayer.querySelectorAll(".overview-edge-label").forEach((element) => element.classList.toggle("is-dimmed", !matches(element)));
   };
   document.querySelectorAll("[data-path]").forEach((button) => button.addEventListener("click", () => applyPathFocus(button.dataset.path)));
@@ -1032,11 +1269,36 @@
     ["Final", derived.finalProjection, 32],
   ];
   const failed = checks.filter(([, actual, expected]) => actual !== expected);
+  const fanoutFailures = [];
+  const seenFanoutIds = new Set();
+  const seenFanoutEdges = new Set();
+  fanouts.forEach((fanout) => {
+    if (seenFanoutIds.has(fanout.id)) fanoutFailures.push(`duplicate:${fanout.id}`);
+    seenFanoutIds.add(fanout.id);
+    if (!nodeById.has(fanout.from)) fanoutFailures.push(`source:${fanout.id}`);
+    fanout.branches.forEach((branch) => {
+      const semanticEdge = edgeById.get(branch.edgeId);
+      if (!semanticEdge || semanticEdge.from !== fanout.from || !nodeById.has(semanticEdge.to)) fanoutFailures.push(`branch:${branch.edgeId}`);
+      if (seenFanoutEdges.has(branch.edgeId)) fanoutFailures.push(`reused:${branch.edgeId}`);
+      seenFanoutEdges.add(branch.edgeId);
+    });
+    const sourcePorts = portLayer.querySelectorAll(`.fanout-source[data-fanout-id="${fanout.id}"]`).length;
+    if (sourcePorts !== 1) fanoutFailures.push(`source-port:${fanout.id}`);
+  });
+  overviewFanouts.forEach((fanout) => {
+    if (seenFanoutIds.has(fanout.id)) fanoutFailures.push(`duplicate:${fanout.id}`);
+    seenFanoutIds.add(fanout.id);
+    if (!overviewNodeById.has(fanout.from)) fanoutFailures.push(`overview-source:${fanout.id}`);
+    fanout.branches.forEach((branch) => {
+      if (!overviewNodeById.has(branch.to)) fanoutFailures.push(`overview-target:${branch.id}`);
+    });
+  });
   const status = document.getElementById("shape-check-status");
-  if (failed.length === 0) {
-    status.textContent = `✓ ${checks.length} 项 shape contract 已通过`;
+  if (failed.length === 0 && fanoutFailures.length === 0) {
+    status.textContent = `✓ ${checks.length} 项 shape contract · ${fanouts.length + overviewFanouts.length} 组 fan-out 路由已通过`;
   } else {
-    status.textContent = `Shape 校验失败：${failed.map(([name]) => name).join(", ")}`;
+    const failures = [...failed.map(([name]) => name), ...fanoutFailures];
+    status.textContent = `计算图校验失败：${failures.join(", ")}`;
     status.classList.add("is-error");
   }
 
