@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>WMPO 单层完整计算图</title>
+  <link rel="stylesheet" href="assets/compute-graph.css">
+  <link rel="stylesheet" href="assets/preferences.css">
+</head>
+<body>
+  <a class="skip-link" href="#compute-graph-viewport">跳到计算图</a>
+  <header class="compute-header">
+    <nav class="header-nav" aria-label="学习页面导航">
+      <a href="index.html">逐步教学</a>
+      <a href="end-to-end.html">端到端架构</a>
+      <a href="time-alignment.html">Video / Action 时间轴</a>
+      <a href="block-detail.html">Block 精细图</a>
+    </nav>
+    <div class="header-copy">
+      <p>EXECUTED GRAPH · SHAPE TRACE · ONE EXPANDED PAIR</p>
+      <h1>WMPO 单层完整计算图</h1>
+      <span>一次 concat → Rectified Flow ×30 → 同一个 STDiT3 forward → 8 帧 future RGB</span>
+    </div>
+    <div class="header-spec" aria-label="示例规格">
+      <b>B=1 · T=12 · 256²</b>
+      <span>H=1152 · heads=16 · S=256 · Pair 只展开 1 层</span>
+    </div>
+  </header>
+
+  <main class="compute-shell">
+    <section class="graph-intro" aria-label="计算图阅读说明">
+      <div><b>当前执行主链</b><span>CFG 配置存在，但当前 RFLOW 组合代码被注释，因此只作为灰色说明。</span></div>
+      <div><b>一层是什么意思</b><span>图中完整展开 1 个 Spatial → Temporal Pair；真实模型顺序执行 28 个 Pair。</span></div>
+      <div><b>箭头如何连接</b><span>每条线均连接独立 tensor/operator port，不以整个 Block 外框作为端点。</span></div>
+    </section>
+
+    <div class="compute-toolbar" aria-label="计算图工具栏">
+      <div class="tool-group shape-mode" role="group" aria-label="Shape 显示模式">
+        <span>Shape</span>
+        <button type="button" class="is-active" data-shape-mode="concrete" aria-pressed="true">具体数值</button>
+        <button type="button" data-shape-mode="symbolic" aria-pressed="false">符号</button>
+      </div>
+      <div class="tool-group focus-tools" role="group" aria-label="聚焦计算区域">
+        <span>聚焦</span>
+        <button type="button" data-focus="all">全图</button>
+        <button type="button" data-focus="rollout">Rollout</button>
+        <button type="button" data-focus="sampler">RFlow ×30</button>
+        <button type="button" data-focus="action">Action / 6H</button>
+        <button type="button" data-focus="spatial">Spatial</button>
+        <button type="button" data-focus="temporal">Temporal</button>
+        <button type="button" data-focus="output">输出</button>
+      </div>
+      <div class="tool-group path-tools" role="group" aria-label="高亮数据路径">
+        <span>路径</span>
+        <button type="button" data-path="video">Video</button>
+        <button type="button" data-path="action">Action</button>
+        <button type="button" data-path="time">Timestep</button>
+        <button type="button" data-path="mask">Mask / t₀</button>
+        <button type="button" data-path="clear">清除</button>
+      </div>
+      <div class="tool-group zoom-tools" role="group" aria-label="画布缩放">
+        <button type="button" id="zoom-out" aria-label="缩小">−</button>
+        <output id="zoom-value">100%</output>
+        <button type="button" id="zoom-in" aria-label="放大">＋</button>
+        <button type="button" id="fit-graph">适合窗口</button>
+      </div>
+    </div>
+
+    <div class="graph-legend" aria-label="连线图例">
+      <span><i class="legend-line video"></i>Video / hidden tensor</span>
+      <span><i class="legend-line action"></i>Action modulation</span>
+      <span><i class="legend-line time"></i>Diffusion timestep</span>
+      <span><i class="legend-line mask"></i>Condition-frame mask / t₀</span>
+      <span><i class="legend-line disabled"></i>配置存在但当前未执行</span>
+    </div>
+
+    <section class="graph-stage" aria-label="可拖拽缩放计算图">
+      <div id="compute-graph-viewport" class="compute-graph-viewport" tabindex="0" aria-label="WMPO 单层完整计算图，可拖拽、滚轮缩放并点击节点">
+        <svg id="compute-graph" viewBox="0 0 3600 3160" role="img" aria-labelledby="compute-svg-title compute-svg-desc">
+          <title id="compute-svg-title">WMPO 从历史帧和动作到未来帧的单层完整计算图</title>
+          <desc id="compute-svg-desc">图中展示 rollout wrapper、30步 Rectified Flow、ActionEncoder、Action-AdaLN、一个 Spatial 与 Temporal Pair、Final Layer、flow update 和 VAE Decoder 的张量形状。</desc>
+        </svg>
+      </div>
+
+      <aside id="compute-inspector" class="compute-inspector" aria-live="polite">
+        <div class="inspector-head">
+          <span id="inspector-kind">SELECT A NODE</span>
+          <button type="button" id="close-inspector" aria-label="收起节点说明">收起</button>
+        </div>
+        <h2 id="inspector-title">点击任意节点查看 shape 如何计算</h2>
+        <div class="inspector-shapes">
+          <div><span>输入</span><code id="inspector-input">—</code></div>
+          <div><span>输出</span><code id="inspector-output">—</code></div>
+        </div>
+        <p id="inspector-description">主图中的shape由同一组基础维度计算，节点和箭头不会各自维护互相冲突的数字。</p>
+        <pre><code id="inspector-formula">B=1, T=4+8=12, H=1152, heads=16</code></pre>
+        <small id="inspector-source">点击节点后显示对应源码位置</small>
+      </aside>
+      <button type="button" id="open-inspector" class="open-inspector" hidden>节点说明</button>
+    </section>
+
+    <section class="shape-contract" aria-labelledby="shape-contract-title">
+      <div>
+        <p>SHAPE CONTRACT</p>
+        <h2 id="shape-contract-title">页面中的关键维度由基础参数推导</h2>
+      </div>
+      <div class="shape-equations">
+        <code>S=(32÷2)×(32÷2)=256</code>
+        <code>head_dim=1152÷16=72</code>
+        <code>QKV=3×1152=3456</code>
+        <code>MLP=4×1152=4608</code>
+        <code>AdaLN=6×1152=6912</code>
+        <code>Final=1×2×2×8=32</code>
+      </div>
+      <p id="shape-check-status" role="status">正在校验 shape…</p>
+    </section>
+  </main>
+
+  <footer>
+    <p><b>边界记忆：</b>STDiT3 一次 forward 只预测当前 sampling step 的8通道latent输出；RFlow重复调用同一个模型30次，最终才解码8帧RGB。</p>
+  </footer>
+
+  <script src="assets/compute-graph.js"></script>
+  <script src="assets/preferences.js"></script>
+</body>
+</html>

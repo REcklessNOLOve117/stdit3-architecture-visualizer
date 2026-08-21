@@ -16,12 +16,13 @@
       <a href="index.html">← 八步教学</a>
       <a href="system-loop.html">三模型闭环</a>
       <a href="end-to-end.html">STDiT3 端到端架构 →</a>
+      <a href="compute-graph.html">单层完整计算图 →</a>
     </nav>
     <div class="header-copy">
       <div>
         <p class="eyebrow">TEMPORAL CONTRACT · RGB → VAE LATENT → ACTION CONDITION</p>
         <h1>历史 4 帧、8 个 Action、未来 8 帧如何对齐</h1>
-        <p class="subtitle">Action 不属于某一张同下标图片；它描述两张相邻图片之间发生的状态转移。</p>
+        <p class="subtitle">MimicGen rollout 先由 <code>env.step(action)</code> 的调用顺序建立 transition；固定 Hz 只决定每个 control step 持续多久。</p>
       </div>
       <div class="contract-badge">
         <span>WM LEARNS</span>
@@ -39,37 +40,179 @@
       <div><span>预测目标</span><strong>Î<sub>t+1</sub> … Î<sub>t+8</sub></strong><small>8 个 future frames</small></div>
     </section>
 
+    <section class="control-step-section" aria-labelledby="control-step-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">PRIMARY ALIGNMENT · MIMICGEN ROLLOUT</p>
+          <h2 id="control-step-title">一次 <code>env.step()</code> 就定义一个 action → next observation</h2>
+        </div>
+        <p>这里的主键是 <b>step_id / 调用顺序</b>，不是把两个独立传感器流事后做最近时间戳匹配。</p>
+      </div>
+
+      <div class="step-controls">
+        <div role="group" aria-label="选择 control step">
+          <button type="button" class="step-button is-active" data-step-index="0" aria-pressed="true">Step 0</button>
+          <button type="button" class="step-button" data-step-index="1" aria-pressed="false">Step 1</button>
+          <button type="button" class="step-button" data-step-index="2" aria-pressed="false">Step 2</button>
+        </div>
+        <label>固定 control frequency
+          <select id="step-hz">
+            <option value="10">10 Hz</option><option value="20" selected>20 Hz</option><option value="30">30 Hz</option><option value="50">50 Hz</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="control-step-scroll">
+        <svg id="control-step-diagram" viewBox="0 0 1360 560" role="img" aria-labelledby="control-svg-title control-svg-desc">
+          <title id="control-svg-title">MimicGen control step 调用顺序对齐</title>
+          <desc id="control-svg-desc">当前 observation 经过 policy 产生 action；env.step 执行动作并同步返回下一个 observation；数组用 step 编号保存 action 与 next observation 的确定关系。</desc>
+        </svg>
+      </div>
+      <div class="step-memory">
+        <strong>一句话记忆</strong>
+        <span><code>(obs[t], action[t])</code> 表示“在 obs[t] 上选择动作”；<code>action[t] → obs[t+1]</code> 表示“动作执行后的结果”。两者不冲突。</span>
+      </div>
+    </section>
+
+    <section id="fusion-panel" class="fusion-section" aria-labelledby="fusion-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">ACTION BRANCH × VIDEO LATENT BRANCH</p>
+          <h2 id="fusion-title">两条支路先各自编码；融合发生在 Spatial Block 的条件调制里</h2>
+        </div>
+        <p>Action embedding 不会拼到 video token，也不会形成独立 Action Layer。它先与 timestep 相加，再生成六组逐帧 AdaLN / gate 参数。</p>
+      </div>
+
+      <div class="fusion-truths" aria-label="融合结论">
+        <div><b>Video 主数据流</b><span>x 始终保持 <code>[B,12,S,1152]</code></span></div>
+        <div><b>Action 条件流</b><span>8 个 action 前补 4 个 <code>NONE</code>，得到12个条件位置</span></div>
+        <div><b>真正融合点</b><span>Spatial Attention 前与 Spatial MLP 前的 AdaLN / gate</span></div>
+      </div>
+
+      <div class="branch-pair">
+        <article class="branch-flow video-branch">
+          <header><span>BRANCH A · VIDEO LATENT</span><b>被处理的 hidden state</b></header>
+          <div class="flow-node"><small>12 个 latent positions</small><strong>x<sub>latent</sub></strong><code>[B,4,12,H<sub>x</sub>,W<sub>x</sub>]</code></div>
+          <i aria-hidden="true">↓</i>
+          <div class="flow-node"><small>Conv3D · patch=(1,2,2)</small><strong>PatchEmbed3D + 2D PE</strong><code>[B,12,S,1152]</code></div>
+          <i aria-hidden="true">↓</i>
+          <div class="flow-node branch-output"><small>送入每个 Spatial Block</small><strong>video hidden x</strong><code>[B,T=12,S,H=1152]</code></div>
+        </article>
+
+        <article class="branch-flow action-branch">
+          <header><span>BRANCH B · ACTION CONDITION</span><b>控制计算方式的条件</b></header>
+          <div class="flow-node"><small>Policy action chunk</small><strong>a<sub>s:s+7</sub></strong><code>[B,8,7]</code></div>
+          <i aria-hidden="true">↓</i>
+          <div class="flow-node"><small>ActionEncoder · Linear → SiLU → Linear</small><strong>7 → 4608 → 1152</strong><code>[B,8,1152]</code></div>
+          <i aria-hidden="true">↓ prepend 4 × learned NONE</i>
+          <div class="flow-node branch-output"><small>只为匹配 T=12 的条件索引；实现中随后 flatten</small><strong>a*</strong><code>语义 [B,12,1152] · 代码 [B·12,1152]</code></div>
+        </article>
+      </div>
+
+      <div class="not-concat"><b>不会执行</b><code>concat(video_tokens, action_tokens)</code><span>Action 不增加 token 数，也不改变 video hidden 的最后一维。</span></div>
+
+      <div class="tensor-alignment">
+        <div class="alignment-heading">
+          <div><p class="section-kicker">TENSOR-LEVEL ALIGNMENT</p><h3>点击12个 temporal slot，区分“索引对齐”与“物理转移”</h3></div>
+          <p>前4个 latent slot 使用 learned NONE；后8个 future latent slot 分别接收8个 action condition。</p>
+        </div>
+        <div class="fusion-slot-scroll">
+          <div class="fusion-slot-grid" role="group" aria-label="选择 temporal tensor slot">
+            <button type="button" class="fusion-slot" data-fusion-slot="0" aria-pressed="false"><small>slot 0</small><b>z<sub>s−3</sub></b><span>NONE</span><em>history</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="1" aria-pressed="false"><small>slot 1</small><b>z<sub>s−2</sub></b><span>NONE</span><em>history</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="2" aria-pressed="false"><small>slot 2</small><b>z<sub>s−1</sub></b><span>NONE</span><em>history</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="3" aria-pressed="false"><small>slot 3</small><b>z<sub>s</sub></b><span>NONE</span><em>latest obs</em></button>
+            <button type="button" class="fusion-slot is-active" data-fusion-slot="4" aria-pressed="true"><small>slot 4</small><b>z<sub>s+1</sub></b><span>a<sub>s</sub></span><em>future 1</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="5" aria-pressed="false"><small>slot 5</small><b>z<sub>s+2</sub></b><span>a<sub>s+1</sub></span><em>future 2</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="6" aria-pressed="false"><small>slot 6</small><b>z<sub>s+3</sub></b><span>a<sub>s+2</sub></span><em>future 3</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="7" aria-pressed="false"><small>slot 7</small><b>z<sub>s+4</sub></b><span>a<sub>s+3</sub></span><em>future 4</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="8" aria-pressed="false"><small>slot 8</small><b>z<sub>s+5</sub></b><span>a<sub>s+4</sub></span><em>future 5</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="9" aria-pressed="false"><small>slot 9</small><b>z<sub>s+6</sub></b><span>a<sub>s+5</sub></span><em>future 6</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="10" aria-pressed="false"><small>slot 10</small><b>z<sub>s+7</sub></b><span>a<sub>s+6</sub></span><em>future 7</em></button>
+            <button type="button" class="fusion-slot" data-fusion-slot="11" aria-pressed="false"><small>slot 11</small><b>z<sub>s+8</sub></b><span>a<sub>s+7</sub></span><em>future 8</em></button>
+          </div>
+        </div>
+        <div id="fusion-slot-detail" class="fusion-slot-detail" aria-live="polite">
+          <div><span>Video slot</span><strong>slot 4 = future latent z<sub>s+1</sub></strong></div>
+          <div><span>Condition slot</span><strong>slot 4 = ActionEncoder(a<sub>s</sub>)</strong></div>
+          <div><span>物理语义</span><strong>o<sub>s</sub> ─a<sub>s</sub>→ o<sub>s+1</sub></strong></div>
+          <div><span>准确解释</span><strong>同一 tensor index；不是同一时刻的两个采样</strong></div>
+        </div>
+      </div>
+
+      <div class="condition-fusion-flow" aria-label="Action 条件进入 Spatial Block 的计算过程">
+        <div class="condition-build">
+          <p class="flow-stage">01 · BUILD CONDITION</p>
+          <div class="condition-equation"><code>repeat(E<sub>t</sub>(t), T=12)</code><i>＋</i><code>E<sub>a</sub>(a*)</code></div>
+          <i aria-hidden="true">↓ 逐 temporal slot 相加，不接触 video x</i>
+          <div class="condition-node"><b>c<sub>i</sub> = E<sub>t</sub>(t) + E<sub>a</sub>(a*<sub>i</sub>)</b><code>[B·12,1152] · 每行对应一个 temporal slot</code></div>
+          <i aria-hidden="true">↓ t_block = SiLU + Linear(1152, 6H)</i>
+          <div class="condition-node six-h"><b>m<sub>i</sub> · 6H = 6912</b><code>[B·12,6912] → Block 内 reshape [B,12,6,1152]</code></div>
+          <div class="six-params" aria-label="六组调制参数">
+            <span>shift<sub>msa</sub></span><span>scale<sub>msa</sub></span><span>gate<sub>msa</sub></span>
+            <span>shift<sub>mlp</sub></span><span>scale<sub>mlp</sub></span><span>gate<sub>mlp</sub></span>
+          </div>
+          <div class="broadcast-note"><code>[B,T,1,H]</code><span>每组参数在该 frame 的 S 个 spatial patches 上广播；不同 temporal slot 可以使用不同 action condition。</span></div>
+          <small class="base-table-note">每个 Spatial Block 还会叠加自己的 learned <code>scale_shift_table</code>，因此28层共享条件语义，但调制参数基座不同。</small>
+        </div>
+
+        <div class="flow-bridge" aria-hidden="true"><span>六组逐帧参数</span><b>→</b><small>进入28个 Spatial Block<br>的相同计算位置</small></div>
+
+        <div class="spatial-fusion">
+          <p class="flow-stage">02 · MODULATE SPATIAL BLOCK ℓ</p>
+          <div class="spatial-input-label"><span>Video hidden 主流</span><code>x<sub>i</sub> [B,T,S,H]</code></div>
+          <div class="compute-group attention-compute">
+            <span>AdaLN before Self-Attention</span>
+            <code>u = (1 + scale<sub>msa,i</sub>) · LN(x<sub>i</sub>) + shift<sub>msa,i</sub></code>
+            <code>x₁ = x<sub>i</sub> + gate<sub>msa,i</sub> · SelfAttn(u)</code>
+          </div>
+          <i aria-hidden="true">↓ x₁ · shape 不变</i>
+          <div class="compute-group mlp-compute">
+            <span>AdaLN before MLP</span>
+            <code>v = (1 + scale<sub>mlp,i</sub>) · LN(x₁) + shift<sub>mlp,i</sub></code>
+            <code>x₂ = x₁ + gate<sub>mlp,i</sub> · MLP(v)</code>
+          </div>
+          <div class="temporal-handoff-note"><b>x₂ 已含 action 影响</b><span>随后原样进入 Temporal Block；Temporal 使用全局 timestep 参数，不直接再读取 Action branch。</span></div>
+        </div>
+      </div>
+    </section>
+
     <section class="frequency-lab" aria-labelledby="frequency-title">
       <div class="section-heading">
         <div>
-          <p class="section-kicker">FREQUENCY LAB</p>
-          <h2 id="frequency-title">先定义 Hz，再谈 frame / action 对齐</h2>
+          <p class="section-kicker">TWO COLLECTION MODES</p>
+          <h2 id="frequency-title">控制步同步采集，与独立 Camera / Control 流不是一回事</h2>
         </div>
-        <p>相机每秒产生 <b>f<sub>v</sub></b> 帧；控制器每秒产生 <b>f<sub>a</sub></b> 个原始指令。STDiT3 最终仍需要每个未来帧区间对应一个有效 action 表示。</p>
+        <p>先选择数据如何产生。WMPO/MimicGen 使用 control-step alignment；只有真实相机与控制器各自连续采样时，才进入 timestamp alignment。</p>
       </div>
 
-      <div class="controls-row">
-        <div class="preset-group" role="group" aria-label="频率示例">
-          <button type="button" class="preset-button is-active" data-video-hz="30" data-action-hz="30" aria-pressed="true">30 Hz / 30 Hz</button>
+      <div class="alignment-mode" role="group" aria-label="数据采集模式">
+        <button type="button" class="mode-button is-active" data-alignment-mode="step" aria-pressed="true"><b>Control-step alignment</b><span>MimicGen / 同步 env.step 返回</span></button>
+        <button type="button" class="mode-button" data-alignment-mode="streams" aria-pressed="false"><b>Timestamp alignment</b><span>独立 Camera / Control 数据流</span></button>
+      </div>
+
+      <div id="frequency-controls" class="controls-row" hidden>
+        <div class="preset-group stream-only" role="group" aria-label="独立数据流频率示例" hidden>
+          <button type="button" class="preset-button" data-video-hz="30" data-action-hz="30" aria-pressed="false">30 Hz / 30 Hz</button>
           <button type="button" class="preset-button" data-video-hz="30" data-action-hz="60" aria-pressed="false">控制更快 · 30 / 60</button>
           <button type="button" class="preset-button" data-video-hz="30" data-action-hz="10" aria-pressed="false">控制更慢 · 30 / 10</button>
         </div>
-        <label>视频频率
+        <label id="video-hz-field"><span id="video-hz-label">Control step / 保存观测频率</span>
           <select id="video-hz">
-            <option value="10">10 Hz</option><option value="15">15 Hz</option><option value="20">20 Hz</option><option value="30" selected>30 Hz</option><option value="60">60 Hz</option>
+            <option value="10">10 Hz</option><option value="15">15 Hz</option><option value="20" selected>20 Hz</option><option value="30">30 Hz</option><option value="60">60 Hz</option>
           </select>
         </label>
-        <label>控制频率
+        <label id="action-hz-field" hidden><span>独立控制器频率</span>
           <select id="action-hz">
-            <option value="5">5 Hz</option><option value="10">10 Hz</option><option value="15">15 Hz</option><option value="20">20 Hz</option><option value="30" selected>30 Hz</option><option value="60">60 Hz</option><option value="90">90 Hz</option><option value="120">120 Hz</option>
+            <option value="5">5 Hz</option><option value="10">10 Hz</option><option value="15">15 Hz</option><option value="20" selected>20 Hz</option><option value="30">30 Hz</option><option value="60">60 Hz</option><option value="90">90 Hz</option><option value="120">120 Hz</option>
           </select>
         </label>
       </div>
 
       <div class="frequency-readout" aria-live="polite">
-        <div><span>视频帧间隔 Δt<sub>v</sub></span><strong id="video-period">33.3 ms</strong></div>
-        <div><span>控制周期 Δt<sub>a</sub></span><strong id="action-period">33.3 ms</strong></div>
-        <div><span>8 帧预测跨度</span><strong id="horizon-duration">266.7 ms</strong></div>
+        <div><span id="video-period-label">每个 control step</span><strong id="video-period">50.0 ms</strong></div>
+        <div><span id="action-period-label">Observation 返回</span><strong id="action-period">每 step 1 张</strong></div>
+        <div><span>8 个 transition 跨度</span><strong id="horizon-duration">400.0 ms</strong></div>
         <div><span>跨度内原始控制周期</span><strong id="raw-action-count">约 8 个</strong></div>
       </div>
       <p id="frequency-verdict" class="frequency-verdict" aria-live="polite"></p>
@@ -79,7 +222,7 @@
       <div class="section-heading compact">
         <div>
           <p class="section-kicker">ONE SHARED TIME AXIS</p>
-          <h2 id="timeline-title">RGB、物理动作、VAE latent 与 STDiT condition 共用同一条时间轴</h2>
+          <h2 id="timeline-title">Step 编号先建立因果对应；固定 Hz 再把 step 映射为物理时间</h2>
         </div>
         <p>点击任意 action，查看它从“物理执行区间”到“未来 latent 条件位置”的准确路由。</p>
       </div>
@@ -114,8 +257,8 @@
 
     <section class="rules-section" aria-labelledby="rules-title">
       <div class="section-heading compact">
-        <div><p class="section-kicker">ALIGNMENT RULES</p><h2 id="rules-title">频率不同时，先变成 8 个“帧区间 action”</h2></div>
-        <p>不要通过截断或重复数组长度来假装对齐；应根据真实时间戳对每个相机区间做重采样。</p>
+        <div><p class="section-kicker">ONLY FOR INDEPENDENT STREAMS</p><h2 id="rules-title">只有相机和控制器独立采样时，才需要按时间戳重采样</h2></div>
+        <p>MimicGen 的同步 <code>env.step()</code> 路径不会经过本节；本节用于真实机器人或异步记录系统。</p>
       </div>
       <div class="rule-grid">
         <article>
@@ -144,20 +287,22 @@
     <section class="code-contract" aria-labelledby="contract-title">
       <div>
         <p class="section-kicker">CURRENT WMPO CONTRACT</p>
-        <h2 id="contract-title">代码定义了索引窗口，但真实 Hz 仍必须由数据采集协议确认</h2>
+        <h2 id="contract-title">WMPO 先用 rollout 的 step 顺序采集，再用数组切片构造训练窗口</h2>
       </div>
       <div class="contract-grid">
+        <div><span>Rollout length</span><code>T = max_steps + 1</code><p>执行 N 个 action，需要 N+1 个 observation 才能完整表示全部 transition。</p></div>
         <div><span>Video slice</span><code>start−3 : start+9</code><p>I<sub>t−3</sub> … I<sub>t+8</sub>，共 12 帧</p></div>
         <div><span>Action slice</span><code>start : start+8</code><p>a<sub>t</sub> … a<sub>t+7</sub>，共 8 个动作</p></div>
         <div><span>2D VAE</span><code>patch_size_time = 1</code><p>RGB frame 与 latent frame 一一对应</p></div>
-        <div class="warning"><span>必须补充</span><code>RGB timestamp + action start/end timestamp</code><p>仅写 <code>fps=30</code> 不能证明传感器与控制器已同步。</p></div>
+        <div><span>Rollout alignment key</span><code>step_id / env.step call order</code><p><code>action[t]</code> 的结果由同一次调用返回为 <code>obs[t+1]</code>，无需事后匹配时间戳。</p></div>
+        <div class="warning"><span>仅独立数据流需要</span><code>RGB timestamp + action timestamp</code><p>真实 camera/control 各自采样时，step index 不再足够，必须明确重采样规则。</p></div>
         <div class="warning"><span>当前 rollout 首步</span><code>z_t × 4</code><p>现有实现把单张初始观测复制成 4 个历史 latent；后续窗口才使用最近 4 个生成 latent。它与“始终输入 4 个真实历史帧”不是同一件事。</p></div>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>核心约定：<b>a<sub>t+k</sub> 对应的是 I<sub>t+k</sub> → I<sub>t+k+1</sub> 的转移</b>；进入 STDiT 时，它被放到目标 future latent z<sub>t+k+1</sub> 的条件位置。</p>
+    <p>核心约定：<b>step t 调用 env.step(a<sub>t</sub>) 同步返回 o<sub>t+1</sub></b>；固定频率把 step 映射为时间，调用顺序把 action 映射为 observation。</p>
   </footer>
 
   <script src="assets/time-alignment.js"></script>

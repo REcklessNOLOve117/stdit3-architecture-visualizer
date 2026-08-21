@@ -5,7 +5,7 @@
 - Open-Sora `opensora/v1.3` 的原生 `STDiT3-XL/2`
 - WMPO `main` 中 action-conditioned STDiT3 世界模型
 
-目录包含七个互相链接的页面：
+目录包含八个互相链接的页面：
 
 - `system-loop.html`：从系统层解释 VLA Policy、World Model、Reward Model 如何交替生成 imagined trajectory、评分并通过 GRPO 更新 Policy，同时区分 Policy Behavior Alignment 对 World Model 的更新。
 - `index.html`：八步 forward 教学版。
@@ -14,6 +14,7 @@
 - `block-detail.html`：以经典 Transformer 架构图的粒度，纵向展开每个 Norm、AdaLN、Attention、gate、residual add 与 MLP；分别查看 WMPO Spatial、WMPO Temporal 和原生 Open-Sora Block。
 - `adaln-toy.html`：用 hidden size=2 数值手算 ActionEncoder、两处 Action-AdaLN、gate、Temporal 输入和 28 层复用。
 - `time-alignment.html`：用统一时间轴解释 4 个历史 RGB/latent、8 个 action transition 与 8 个未来帧的严格对应，并可切换 video Hz 与 action Hz 查看重采样关系。
+- `compute-graph.html`：以当前执行代码为主链，在同一 SVG 中展开一次 concat、Rectified Flow ×30、ActionEncoder / 6H、一个 Spatial→Temporal Pair、Final Layer、flow update 与 VAE Decoder；真实 28 Pair 只作折叠标记。
 
 ## 打开方式
 
@@ -71,8 +72,18 @@
 ### Video / Action 时间对齐
 
 - 打开 `time-alignment.html`，在同一时间轴查看 RGB frame、物理 action 区间、逐帧 VAE latent、STDiT condition position 和原始控制采样。
+- 页面先用可切换的 `env.step(a_t) → next_obs o_{t+1}` 调用图解释 control-step alignment，并展示 `len(video)=len(actions)+1`；固定 Hz 只负责把 step 编号换算成物理时间。
+- Action/Video 融合放大图分别展示 Video latent 主流与 Action condition 支路、`8 action → prepend 4 NONE → 12 condition slots`、逐 slot 的 tensor-level alignment，以及六组 AdaLN/gate 参数进入 Spatial Attention/MLP 前的准确位置。
 - 选择任意 `a_t … a_t+7`，页面会高亮它控制的帧间转移以及它最终进入的 future latent 条件位置。
-- 可切换 `30/30 Hz`、`30/60 Hz`、`30/10 Hz`，观察一对一、控制更快需要聚合、控制更慢需要保持三种情况。
+- 可在 MimicGen 同步 step 模式与独立 Camera/Control 时间戳模式间切换；后者支持 `30/30 Hz`、`30/60 Hz`、`30/10 Hz` 三种重采样示例。
+
+### WMPO 单层完整计算图
+
+- 打开 `compute-graph.html`，按当前 rollout / RFLOW / STDiT3 源码执行边界，从单张首轮 RGB 和后续 latent queue 一直追踪到 8 帧 future RGB。
+- 图中只存在一次真实 `concat(history, noise)`；30 步循环维护并回送完整 12-slot latent，前 4 个 condition slots 在每步更新后由 `torch.where` 恢复。
+- 绿色虚线只路由 Spatial 的六组 Action-AdaLN / gate 参数；Spatial 输出 `x₂` 通过蓝色实线原样进入 Temporal，Temporal 没有 Action 直连。
+- 紫色点线展示 `x_mask + t₀=15` 对 Spatial、Temporal 和 Final Layer modulation 的选择；它不是 Attention Mask。
+- 可切换具体 / 符号 shape，聚焦 Rollout、RFlow、Action、Spatial、Temporal 与输出，并单独高亮 Video、Action、timestep 或 mask 路径；点击节点可查看公式与源码位置。
 
 ### 阅读舒适度
 
@@ -84,6 +95,10 @@
 - `C:\Users\YXWANG\toys\worldmodel_factory\Open-Sora\opensora\models\stdit\stdit3.py`
 - `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\dependencies\opensora\opensora\models\stdit\stdit3.py`
 - `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\dependencies\opensora\opensora\datasets\simplevla_webdataset.py`
+- `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\verl\workers\rollout\robwm_rollout.py`
+- `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\dependencies\opensora\opensora\schedulers\rf\__init__.py`
+- `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\dependencies\opensora\opensora\schedulers\rf\rectified_flow.py`
+- `C:\Users\YXWANG\toys\worldmodel_factory\WMPO\dependencies\opensora\opensora\models\layers\blocks.py`
 
 页面中的 WMPO 示例采用源码默认 `To=4`、`Ta=8`、`action_dim=7`；符号形状仍适用于其他帧数和 action 维度。
 
